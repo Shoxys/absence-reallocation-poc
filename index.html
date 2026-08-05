@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Phase 1 POC — Absence Reallocation</title>
+  <title>Absence Reallocation POC</title>
   <style>
     * { box-sizing: border-box; }
     body {
@@ -808,22 +808,13 @@ function AbsenceReallocationPoc() {
   const gridLine = theme.stroke.secondary;
 
   const nav = [
-    { id: "overview", label: "Overview" },
-    { id: "plf", label: "PLF swap" },
-    { id: "ssp", label: "SSP / Admin" },
-    { id: "flow", label: "Flow" },
-    { id: "reqs", label: "Reqs" },
+    { id: "plf", label: "PLF timetable" },
+    { id: "ssp", label: "Admin confirmation" },
   ];
 
   return (
     <Stack gap={14} style={{ maxWidth: 1000, margin: "0 auto", padding: 16 }}>
-      <Stack gap={4}>
-        <H1>Phase 1 POC — Absence Reallocation</H1>
-        <Text tone="secondary">
-          Larger filters · Needs / Available / Covered / Full (green→yellow→orange→red) · hard cap for PLF
-          swaps only · admin can exceed with warning
-        </Text>
-      </Stack>
+      <H1>Absence Reallocation</H1>
 
       <Row gap={8} wrap>
         {nav.map((item) => (
@@ -837,34 +828,21 @@ function AbsenceReallocationPoc() {
 
       <Divider />
 
-      {screen === "overview" && (
-        <Stack gap={10}>
-          <Callout tone="info" title="Capacity rules">
-            Soft display max is still shown as n/max (e.g. 13/10). Live roster
-            and admin edits may exceed 10. PLF self-swap is blocked at hard
-            cap 10; Admin/SSP swap/add-on may proceed with a warning.
-          </Callout>
-          <Table
-            headers={["Band", "Meaning", "Colour"]}
-            rows={[
-              ["Needs", "Low — promote", "Green"],
-              ["Available", "Low–mid", "Yellow"],
-              ["Covered", "High — de-emphasise", "Orange"],
-              ["Full", "At/over soft max — still show n/max", "Red"],
-            ]}
-          />
-        </Stack>
-      )}
-
       {screen === "plf" && (
         <Stack gap={12}>
           <Row gap={10} align="center" wrap>
-            <H2 style={{ margin: 0 }}>Swap shift</H2>
+            <H2 style={{ margin: 0 }}>PLF timetable</H2>
+            <Pill size="sm" active>
+              User side
+            </Pill>
             <Spacer />
             <Text tone="secondary" size="small">
               {week}
             </Text>
           </Row>
+          <Text tone="secondary" size="small">
+            Facilitator view — pick an open slot on the week grid to swap your current shift.
+          </Text>
 
           <Card>
             <CardBody>
@@ -1199,14 +1177,22 @@ function AbsenceReallocationPoc() {
 
       {screen === "ssp" && (
         <Stack gap={14}>
-          <H2>Admin Overrides</H2>
-          <Callout tone="neutral" title="Over hard cap">
-            Main roster edits and admin swaps may exceed 10 (e.g. 13/10 on the
-            grid). Show a warning on swap/add-on; do not hard-block admins.
+          <Row gap={10} align="center" wrap>
+            <H2 style={{ margin: 0 }}>Confirm PLF override</H2>
+            <Pill size="sm" active>
+              Admin / SSP
+            </Pill>
+          </Row>
+          <Text tone="secondary" size="small">
+            Admin confirmation — review the PLF, choose swap or add-on, then confirm the override.
+          </Text>
+          <Callout tone="warning" title="Confirm before applying">
+            This is the admin confirmation step for a PLF override. Soft max can
+            show over 10 (e.g. 13/10); warn on confirm, but do not hard-block admins.
           </Callout>
           <Grid columns={2} gap={12}>
             <Card>
-              <CardHeader>Assign override</CardHeader>
+              <CardHeader>Confirm override for PLF</CardHeader>
               <CardBody>
                 <Stack gap={10}>
                   <Table
@@ -1231,13 +1217,13 @@ function AbsenceReallocationPoc() {
                       Add-on
                     </Pill>
                   </Row>
-                  <Button variant="primary">Apply override</Button>
+                  <Button variant="primary">Confirm override</Button>
                 </Stack>
               </CardBody>
             </Card>
 
             <Card>
-              <CardHeader>Active this week</CardHeader>
+              <CardHeader>Confirmed this week</CardHeader>
               <CardBody>
                 <Table
                   headers={["PLF", "Action", "Slot", "Assigned by"]}
@@ -1258,41 +1244,6 @@ function AbsenceReallocationPoc() {
             </Card>
           </Grid>
         </Stack>
-      )}
-
-      {screen === "flow" && (
-        <Table
-          headers={["Rule", "Behaviour"]}
-          rows={[
-            [
-              "Bands",
-              "Needs (green) · Available (yellow) · Covered (orange) · Full (red, always n/max)",
-            ],
-            [
-              "Hard cap 10",
-              "Blocks PLF self-swap only; display can show 13/10",
-            ],
-            [
-              "Admin",
-              "Roster + swap overrides may exceed; warn on swap UI",
-            ],
-            ["Admin table", "Leave→Join colours; no Status column"],
-          ]}
-        />
-      )}
-
-      {screen === "reqs" && (
-        <Table
-          headers={["Ask", "Done"]}
-          rows={[
-            ["Larger pronounced filters", "Yes"],
-            ["Shaded day header + grid lines", "Yes"],
-            ["Smaller current-shift box", "Yes"],
-            ["Almost full → Covered; mid → OK", "Yes"],
-            ["Over-cap display + admin warning", "Yes"],
-            ["Leave→Join colours; drop Status", "Yes"],
-          ]}
-        />
       )}
     </Stack>
   );
