@@ -1,0 +1,1305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Phase 1 POC — Absence Reallocation</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: #f5f6f8;
+      color: #111827;
+      line-height: 1.45;
+    }
+    #root { min-height: 100vh; }
+    button { font-family: inherit; }
+  </style>
+  <script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.26.0/babel.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel" data-presets="react">
+const { useState } = React;
+
+/* ── Light theme (replaces useHostTheme) ── */
+const theme = {
+  kind: "light",
+  accent: { primary: "#2563eb" },
+  stroke: { secondary: "#d0d5dd", tertiary: "#e4e7ec" },
+  fill: { primary: "#dbeafe", tertiary: "#e4eaf0", quaternary: "#eceff2" },
+  bg: { elevated: "#ffffff", editor: "#f8f9fb", chrome: "#f3f4f6" },
+  text: { primary: "#111827", secondary: "#4b5563", tertiary: "#6b7280" },
+};
+
+const LEVEL_HEX = {
+  green: "#2f7a4a",
+  yellow: "#b8941f",
+  orange: "#c45f1a",
+  red: "#a04040",
+};
+
+/* ── Tiny UI primitives (replaces cursor/canvas) ── */
+function Stack({ gap = 8, children, style }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap, ...style }}>
+      {children}
+    </div>
+  );
+}
+
+function Row({ gap = 8, align = "stretch", wrap, children, style }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "row",
+        gap,
+        alignItems:
+          align === "center" ? "center" : align === "stretch" ? "stretch" : align,
+        flexWrap: wrap ? "wrap" : "nowrap",
+        ...style,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function Spacer() {
+  return <div style={{ flex: 1, minWidth: 8 }} />;
+}
+
+function Divider() {
+  return (
+    <hr
+      style={{
+        border: "none",
+        borderTop: `1px solid ${theme.stroke.secondary}`,
+        margin: 0,
+      }}
+    />
+  );
+}
+
+function H1({ children, style }) {
+  return (
+    <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, ...style }}>
+      {children}
+    </h1>
+  );
+}
+
+function H2({ children, style }) {
+  return (
+    <h2 style={{ margin: 0, fontSize: 18, fontWeight: 650, ...style }}>
+      {children}
+    </h2>
+  );
+}
+
+function Text({
+  children,
+  size = "md",
+  weight = "normal",
+  tone = "primary",
+  style,
+}) {
+  const fontSize = size === "small" ? 12 : 14;
+  const fontWeight = weight === "semibold" ? 600 : 400;
+  const color =
+    tone === "secondary"
+      ? theme.text.secondary
+      : tone === "tertiary"
+        ? theme.text.tertiary
+        : theme.text.primary;
+  return (
+    <span style={{ fontSize, fontWeight, color, ...style }}>{children}</span>
+  );
+}
+
+function Pill({ children, active, onClick, size = "md" }) {
+  const sm = size === "sm";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        padding: sm ? "3px 8px" : "6px 12px",
+        borderRadius: 999,
+        border: `1.5px solid ${active ? theme.accent.primary : theme.stroke.secondary}`,
+        background: active ? theme.fill.primary : theme.bg.elevated,
+        color: theme.text.primary,
+        fontSize: sm ? 11 : 13,
+        fontWeight: active ? 600 : 500,
+        cursor: onClick ? "pointer" : "default",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function Button({ children, variant = "primary", disabled, onClick }) {
+  const styles = {
+    primary: {
+      background: theme.accent.primary,
+      color: "#fff",
+      border: `1px solid ${theme.accent.primary}`,
+    },
+    secondary: {
+      background: theme.bg.chrome,
+      color: theme.text.primary,
+      border: `1px solid ${theme.stroke.secondary}`,
+    },
+    ghost: {
+      background: "transparent",
+      color: theme.text.secondary,
+      border: `1px solid ${theme.stroke.secondary}`,
+    },
+  };
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      style={{
+        padding: "8px 14px",
+        borderRadius: 8,
+        fontSize: 13,
+        fontWeight: 600,
+        cursor: disabled ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.45 : 1,
+        ...styles[variant],
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function Card({ children }) {
+  return (
+    <div
+      style={{
+        borderRadius: 10,
+        border: `1px solid ${theme.stroke.secondary}`,
+        background: theme.bg.elevated,
+        overflow: "hidden",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function CardHeader({ children }) {
+  return (
+    <div
+      style={{
+        padding: "10px 14px",
+        borderBottom: `1px solid ${theme.stroke.tertiary}`,
+        fontSize: 13,
+        fontWeight: 600,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function CardBody({ children }) {
+  return <div style={{ padding: 14 }}>{children}</div>;
+}
+
+function Callout({ tone = "info", title, children }) {
+  const tones = {
+    info: { bg: "#eff6ff", border: "#93c5fd", title: "#1d4ed8" },
+    success: { bg: "#ecfdf5", border: "#6ee7b7", title: "#047857" },
+    warning: { bg: "#fffbeb", border: "#fcd34d", title: "#b45309" },
+    neutral: { bg: "#f8fafc", border: theme.stroke.secondary, title: theme.text.primary },
+  };
+  const t = tones[tone] || tones.info;
+  return (
+    <div
+      style={{
+        padding: "12px 14px",
+        borderRadius: 10,
+        border: `1px solid ${t.border}`,
+        background: t.bg,
+      }}
+    >
+      <div style={{ fontWeight: 650, fontSize: 13, color: t.title, marginBottom: 4 }}>
+        {title}
+      </div>
+      <div style={{ fontSize: 13, color: theme.text.secondary }}>{children}</div>
+    </div>
+  );
+}
+
+function Table({ headers, rows }) {
+  return (
+    <div style={{ overflowX: "auto", borderRadius: 10, border: `1px solid ${theme.stroke.secondary}` }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        <thead>
+          <tr style={{ background: theme.fill.tertiary }}>
+            {headers.map((h) => (
+              <th
+                key={h}
+                style={{
+                  textAlign: "left",
+                  padding: "10px 12px",
+                  borderBottom: `1px solid ${theme.stroke.secondary}`,
+                  fontWeight: 600,
+                }}
+              >
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, i) => (
+            <tr key={i} style={{ background: i % 2 ? theme.bg.editor : theme.bg.elevated }}>
+              {row.map((cell, j) => (
+                <td
+                  key={j}
+                  style={{
+                    padding: "10px 12px",
+                    borderBottom: `1px solid ${theme.stroke.tertiary}`,
+                    verticalAlign: "top",
+                  }}
+                >
+                  {cell}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function Grid({ columns = 2, gap = 12, children }) {
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+        gap,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function UsageBar({ total, topLeftLabel, topRightLabel, segments }) {
+  const filled = segments.reduce((s, seg) => s + seg.value, 0);
+  const pct = total > 0 ? Math.min(100, (filled / total) * 100) : 0;
+  const color = LEVEL_HEX[segments[0]?.color] || theme.accent.primary;
+  return (
+    <div>
+      <Row gap={8} style={{ marginBottom: 6 }}>
+        <Text size="small" weight="semibold">{topLeftLabel}</Text>
+        <Spacer />
+        <Text size="small" tone="secondary">{topRightLabel}</Text>
+      </Row>
+      <div
+        style={{
+          height: 10,
+          borderRadius: 6,
+          background: theme.fill.quaternary,
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            width: `${pct}%`,
+            height: "100%",
+            background: color,
+            borderRadius: 6,
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+/* ── Domain + mock data (same as canvas) ── */
+const HARD_CAP = 10;
+
+const ME = {
+  badges: ["MATH", "STAT"],
+  primaryBadge: "MATH",
+};
+
+const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+const TIMES = [
+  { key: "10", label: "10:00" },
+  { key: "12", label: "12:00" },
+  { key: "14", label: "14:00" },
+  { key: "16", label: "16:00" },
+];
+
+const LEVEL_COLOR = {
+  needs: "green",
+  available: "yellow",
+  covered: "orange",
+  full: "red",
+};
+
+const DISCIPLINE_ICON = {
+  MATH: "∑",
+  STAT: "σ",
+  PHYS: "⚡",
+  CHEM: "⚗",
+  BIO: "✿",
+  ENG: "⚙",
+};
+
+const SLOTS = [
+  {
+    id: "mon-10",
+    day: "Mon",
+    timeKey: "10",
+    time: "10:00–12:00",
+    location: "GP Library L3",
+    locationCode: "GP-V714",
+    max: HARD_CAP,
+    level: "needs",
+    facilitators: [
+      { name: "Sam Lee", badges: ["PHYS", "CHEM"] },
+      { name: "Jordan Park", badges: ["PHYS"] },
+    ],
+  },
+  {
+    id: "mon-14",
+    day: "Mon",
+    timeKey: "14",
+    time: "14:00–16:00",
+    location: "GP Library L3",
+    locationCode: "GP-V714",
+    max: HARD_CAP,
+    level: "available",
+    facilitators: [
+      { name: "Riley Ng", badges: ["MATH", "STAT"] },
+      { name: "Casey Wu", badges: ["MATH"] },
+      { name: "Avery Cole", badges: ["CHEM"] },
+      { name: "Quinn West", badges: ["PHYS"] },
+      { name: "Blake Tran", badges: ["STAT"] },
+      { name: "You", badges: ["MATH", "STAT"] },
+    ],
+  },
+  {
+    id: "tue-10",
+    day: "Tue",
+    timeKey: "10",
+    time: "10:00–12:00",
+    location: "KG Block B",
+    locationCode: "KG-B201",
+    max: HARD_CAP,
+    level: "covered",
+    facilitators: Array.from({ length: 8 }, (_, i) => ({
+      name: `Facilitator ${i + 1}`,
+      badges: i % 2 === 0 ? ["PHYS"] : ["CHEM"],
+    })),
+  },
+  {
+    id: "tue-14",
+    day: "Tue",
+    timeKey: "14",
+    time: "14:00–16:00",
+    location: "GP Library L3",
+    locationCode: "GP-V714",
+    max: HARD_CAP,
+    level: "needs",
+    facilitators: [{ name: "Morgan Ellis", badges: ["MATH", "STAT"] }],
+  },
+  {
+    id: "wed-12",
+    day: "Wed",
+    timeKey: "12",
+    time: "12:00–14:00",
+    location: "GP Library L3",
+    locationCode: "GP-V714",
+    max: HARD_CAP,
+    level: "needs",
+    facilitators: [
+      { name: "Pat Rivera", badges: ["CHEM"] },
+      { name: "Robin Shaw", badges: ["PHYS"] },
+      { name: "Sky Patel", badges: ["BIO"] },
+    ],
+  },
+  {
+    id: "thu-10",
+    day: "Thu",
+    timeKey: "10",
+    time: "10:00–12:00",
+    location: "KG Block B",
+    locationCode: "KG-B201",
+    max: HARD_CAP,
+    level: "available",
+    facilitators: Array.from({ length: 6 }, (_, i) => ({
+      name: `Staff ${i + 1}`,
+      badges: i === 0 ? ["MATH"] : ["PHYS"],
+    })),
+  },
+  {
+    id: "fri-14",
+    day: "Fri",
+    timeKey: "14",
+    time: "14:00–16:00",
+    location: "Online",
+    locationCode: "Online",
+    max: HARD_CAP,
+    level: "covered",
+    facilitators: Array.from({ length: 9 }, (_, i) => ({
+      name: `Facilitator ${i + 1}`,
+      badges: i % 3 === 0 ? ["MATH"] : ["PHYS"],
+    })),
+  },
+  {
+    id: "wed-14",
+    day: "Wed",
+    timeKey: "14",
+    time: "14:00–16:00",
+    location: "GP Library L3",
+    locationCode: "GP-V714",
+    max: HARD_CAP,
+    level: "full",
+    facilitators: Array.from({ length: 13 }, (_, i) => ({
+      name: `Facilitator ${i + 1}`,
+      badges: ["PHYS"],
+    })),
+  },
+];
+
+const OVERRIDES = [
+  {
+    plf: "Alex Kim",
+    kind: "swap",
+    fromSlot: "Mon 14:00–16:00 · GP-V714",
+    toSlot: "Mon 10:00–12:00 · GP-V714",
+    assignedBy: "Self",
+  },
+  {
+    plf: "Sam Lee",
+    kind: "addon",
+    toSlot: "Tue 10:00–12:00 · KG-B201",
+    assignedBy: "SSP Admin",
+  },
+  {
+    plf: "Jordan Park",
+    kind: "leaveOnly",
+    fromSlot: "Fri 10:00–12:00 · Online",
+    toSlot: "—",
+    assignedBy: "SSP Admin",
+  },
+];
+
+function PeopleIcon({ color }) {
+  return (
+    <svg width="12" height="12" viewBox="0 0 16 16" fill={color} aria-hidden="true">
+      <circle cx="6" cy="5" r="2.2" />
+      <path d="M1.5 13c0-2.2 2-3.5 4.5-3.5S10.5 10.8 10.5 13v1h-9v-1z" />
+      <circle cx="11.5" cy="5.5" r="1.8" opacity="0.85" />
+      <path
+        d="M11 9.2c1.7.2 3.5 1.2 3.5 3v1.3H11"
+        opacity="0.85"
+        fill="none"
+        stroke={color}
+        strokeWidth="1.4"
+      />
+    </svg>
+  );
+}
+
+function DisciplineFitIcon({ color }) {
+  return (
+    <svg width="11" height="11" viewBox="0 0 16 16" aria-hidden="true">
+      <path
+        d="M8 1.5l1.5 4.2H14l-3.5 2.7 1.3 4.3L8 10.5l-3.8 2.7 1.3-4.3L2 5.7h4.5L8 1.5z"
+        fill={color}
+      />
+    </svg>
+  );
+}
+
+function FilterChip({ label, active, onClick, large }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        padding: large ? "7px 12px" : "5px 10px",
+        borderRadius: 999,
+        border: `1.5px solid ${active ? theme.accent.primary : theme.stroke.secondary}`,
+        background: active ? theme.fill.primary : theme.bg.elevated,
+        color: theme.text.primary,
+        fontSize: 12,
+        fontWeight: active ? 600 : 500,
+        cursor: "pointer",
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+function disciplineFit(slot) {
+  const n = slot.facilitators.filter((f) =>
+    f.badges.some((b) => ME.badges.includes(b))
+  ).length;
+  if (n === 0) return "missing";
+  if (n === 1) return "low";
+  return "coveredDisc";
+}
+
+function borderColor(level) {
+  switch (level) {
+    case "needs":
+      return "#2f7a4a";
+    case "available":
+      return "#b8941f";
+    case "covered":
+      return "#c45f1a";
+    case "full":
+      return "#a04040";
+  }
+}
+
+function softFill(level) {
+  switch (level) {
+    case "needs":
+      return "#e8f6ee";
+    case "available":
+      return "#faf4dc";
+    case "covered":
+      return "#fceee4";
+    case "full":
+      return "#f6e8e8";
+  }
+}
+
+function slotAt(day, timeKey) {
+  return SLOTS.find((s) => s.day === day && s.timeKey === timeKey);
+}
+
+function bandFromCount(count, max) {
+  if (count >= max) return "full";
+  const r = count / max;
+  if (r <= 0.35) return "needs";
+  if (r <= 0.65) return "available";
+  return "covered";
+}
+
+function shortcutRank(slot) {
+  const level = bandFromCount(slot.facilitators.length, slot.max);
+  const staff =
+    level === "needs" ? 0 : level === "available" ? 1 : level === "covered" ? 2 : 3;
+  const disc =
+    disciplineFit(slot) === "missing"
+      ? 0
+      : disciplineFit(slot) === "low"
+        ? 1
+        : 2;
+  return staff * 10 + disc;
+}
+
+function levelLabel(level) {
+  switch (level) {
+    case "needs":
+      return "Needs";
+    case "available":
+      return "Available";
+    case "covered":
+      return "Covered";
+    case "full":
+      return "Full";
+  }
+}
+
+function GridCell({ slot, selected, dimmed, isCurrent, onPick }) {
+  if (!slot) {
+    return (
+      <div
+        style={{
+          flex: 1,
+          minHeight: 68,
+          borderRadius: 8,
+          border: `1px solid ${theme.stroke.tertiary}`,
+          background: theme.bg.editor,
+        }}
+      />
+    );
+  }
+
+  const count = slot.facilitators.length;
+  const level = bandFromCount(count, slot.max);
+  const disabledForPlfSwap = count >= HARD_CAP;
+  const fit = disciplineFit(slot);
+  const showFit = !disabledForPlfSwap && (fit === "missing" || fit === "low");
+  const accent = borderColor(level);
+  const border = selected
+    ? theme.accent.primary
+    : isCurrent
+      ? theme.accent.primary
+      : accent;
+
+  return (
+    <div
+      role="button"
+      title={`${levelLabel(level)} · ${count}/${slot.max}${
+        count > slot.max ? " (over soft max)" : ""
+      }${showFit ? ` · Needs ${ME.primaryBadge}` : ""}`}
+      onClick={() => {
+        if (!dimmed && !(disabledForPlfSwap && !selected)) onPick(slot);
+      }}
+      style={{
+        flex: 1,
+        minHeight: 68,
+        borderRadius: 8,
+        border: `2px ${isCurrent && !selected ? "dashed" : "solid"} ${border}`,
+        background: isCurrent && !selected ? theme.bg.elevated : softFill(level),
+        opacity: dimmed ? 0.25 : disabledForPlfSwap && level === "full" ? 0.55 : 1,
+        cursor: dimmed ? "default" : "pointer",
+        padding: "8px 10px",
+      }}
+    >
+      {level === "full" && !isCurrent ? (
+        <Stack gap={3}>
+          <Row gap={5} align="center">
+            <PeopleIcon color={theme.text.secondary} />
+            <Text size="small" weight="semibold">
+              {count}/{slot.max}
+            </Text>
+          </Row>
+          <Text size="small" weight="semibold" style={{ color: accent }}>
+            Full
+          </Text>
+        </Stack>
+      ) : (
+        <Stack gap={3}>
+          <Row gap={5} align="center">
+            <PeopleIcon color={theme.text.secondary} />
+            <Text size="small" weight="semibold">
+              {count}/{slot.max}
+            </Text>
+            {showFit && (
+              <span title={`Needs ${ME.primaryBadge}`}>
+                <DisciplineFitIcon color={theme.accent.primary} />
+              </span>
+            )}
+          </Row>
+          <Text
+            size="small"
+            weight="semibold"
+            style={{ color: isCurrent && !selected ? theme.accent.primary : accent }}
+          >
+            {isCurrent && !selected ? "Current" : levelLabel(level)}
+          </Text>
+        </Stack>
+      )}
+    </div>
+  );
+}
+
+function ActionCell({ row }) {
+  const leaveColor = "#a04040";
+  const joinColor = "#2f7a4a";
+
+  if (row.kind === "swap") {
+    return (
+      <Row gap={4} align="center">
+        <Text size="small" weight="semibold" style={{ color: leaveColor }}>
+          Leave
+        </Text>
+        <Text size="small" tone="secondary">
+          →
+        </Text>
+        <Text size="small" weight="semibold" style={{ color: joinColor }}>
+          Join
+        </Text>
+      </Row>
+    );
+  }
+  if (row.kind === "addon") {
+    return (
+      <Text size="small" weight="semibold" style={{ color: joinColor }}>
+        Add-on
+      </Text>
+    );
+  }
+  return (
+    <Text size="small" weight="semibold" style={{ color: leaveColor }}>
+      Leave
+    </Text>
+  );
+}
+
+function timeChipLabel(t) {
+  if (t.key === "10") return "10–12";
+  if (t.key === "12") return "12–14";
+  if (t.key === "14") return "14–16";
+  return "16–18";
+}
+
+function AbsenceReallocationPoc() {
+  const [screen, setScreen] = useState("plf");
+  const [selected, setSelected] = useState(null);
+  const [confirmed, setConfirmed] = useState(false);
+  const [dayFilter, setDayFilter] = useState("All");
+  const [timeFilter, setTimeFilter] = useState("All");
+  const [needsOnly, setNeedsOnly] = useState(false);
+  const [needsMathOnly, setNeedsMathOnly] = useState(false);
+  const [leaveOriginal, setLeaveOriginal] = useState(true);
+  const [ackOverCap, setAckOverCap] = useState(false);
+
+  const week = "Week of 4 Aug 2026";
+  const currentShift = {
+    day: "Mon",
+    timeKey: "14",
+    time: "14:00–16:00",
+    location: "GP Library L3",
+    roster: "STEM Drop-in S2 2026",
+  };
+
+  const selectedSlot = SLOTS.find((s) => s.id === selected) ?? null;
+  const selectedCount = selectedSlot?.facilitators.length ?? 0;
+  const overCapWarning = !!selectedSlot && selectedCount >= HARD_CAP;
+
+  const needsCount = SLOTS.filter(
+    (s) => bandFromCount(s.facilitators.length, s.max) === "needs"
+  ).length;
+
+  const shortcuts = SLOTS.filter(
+    (s) => bandFromCount(s.facilitators.length, s.max) === "needs"
+  )
+    .sort((a, b) => shortcutRank(a) - shortcutRank(b))
+    .slice(0, 3);
+
+  function pickSlot(slot) {
+    setSelected(slot.id);
+    setConfirmed(false);
+    setAckOverCap(false);
+  }
+
+  function cellDimmed(slot) {
+    if (!slot) return false;
+    const level = bandFromCount(slot.facilitators.length, slot.max);
+    if (needsOnly && level !== "needs") return true;
+    if (
+      needsMathOnly &&
+      disciplineFit(slot) !== "missing" &&
+      disciplineFit(slot) !== "low"
+    ) {
+      return true;
+    }
+    return false;
+  }
+
+  const headerBg = "#e4eaf0";
+  const timeColBg = "#eceff2";
+  const gridLine = theme.stroke.secondary;
+
+  const nav = [
+    { id: "overview", label: "Overview" },
+    { id: "plf", label: "PLF swap" },
+    { id: "ssp", label: "SSP / Admin" },
+    { id: "flow", label: "Flow" },
+    { id: "reqs", label: "Reqs" },
+  ];
+
+  return (
+    <Stack gap={14} style={{ maxWidth: 1000, margin: "0 auto", padding: 16 }}>
+      <Stack gap={4}>
+        <H1>Phase 1 POC — Absence Reallocation</H1>
+        <Text tone="secondary">
+          Larger filters · Needs / Available / Covered / Full (green→yellow→orange→red) · hard cap for PLF
+          swaps only · admin can exceed with warning
+        </Text>
+      </Stack>
+
+      <Row gap={8} wrap>
+        {nav.map((item) => (
+          <span key={item.id}>
+            <Pill active={screen === item.id} onClick={() => setScreen(item.id)}>
+              {item.label}
+            </Pill>
+          </span>
+        ))}
+      </Row>
+
+      <Divider />
+
+      {screen === "overview" && (
+        <Stack gap={10}>
+          <Callout tone="info" title="Capacity rules">
+            Soft display max is still shown as n/max (e.g. 13/10). Live roster
+            and admin edits may exceed 10. PLF self-swap is blocked at hard
+            cap 10; Admin/SSP swap/add-on may proceed with a warning.
+          </Callout>
+          <Table
+            headers={["Band", "Meaning", "Colour"]}
+            rows={[
+              ["Needs", "Low — promote", "Green"],
+              ["Available", "Low–mid", "Yellow"],
+              ["Covered", "High — de-emphasise", "Orange"],
+              ["Full", "At/over soft max — still show n/max", "Red"],
+            ]}
+          />
+        </Stack>
+      )}
+
+      {screen === "plf" && (
+        <Stack gap={12}>
+          <Row gap={10} align="center" wrap>
+            <H2 style={{ margin: 0 }}>Swap shift</H2>
+            <Spacer />
+            <Text tone="secondary" size="small">
+              {week}
+            </Text>
+          </Row>
+
+          <Card>
+            <CardBody>
+              <Row gap={10} align="center" wrap>
+                <Text size="small" weight="semibold">
+                  Your shift
+                </Text>
+                <Text size="small">
+                  {currentShift.day} {currentShift.time}
+                </Text>
+                <Text size="small" tone="secondary">
+                  {currentShift.location}
+                </Text>
+                {ME.badges.map((b) => (
+                  <span key={b}>
+                    <Pill size="sm" active={b === ME.primaryBadge}>
+                      {DISCIPLINE_ICON[b] ?? "·"} {b}
+                    </Pill>
+                  </span>
+                ))}
+                <Spacer />
+                <Text size="small" tone="tertiary">
+                  Leaves on swap
+                </Text>
+              </Row>
+            </CardBody>
+          </Card>
+
+          {needsCount > 0 && (
+            <Callout tone="success" title={`${needsCount} slots need people`}>
+              Prefer green cells when you can. ★ = Needs {ME.primaryBadge}.
+            </Callout>
+          )}
+
+          <Stack
+            gap={10}
+            style={{
+              padding: 14,
+              borderRadius: 10,
+              border: `1px solid ${theme.stroke.secondary}`,
+              background: theme.bg.elevated,
+            }}
+          >
+            <Row gap={8} align="center" wrap>
+              <Text size="small" weight="semibold">
+                Day
+              </Text>
+              {["All", ...DAYS].map((d) => (
+                <span key={d}>
+                  <FilterChip
+                    large
+                    label={d}
+                    active={dayFilter === d}
+                    onClick={() => setDayFilter(d)}
+                  />
+                </span>
+              ))}
+              <Text size="small" weight="semibold" style={{ marginLeft: 6 }}>
+                Time
+              </Text>
+              <FilterChip
+                large
+                label="All"
+                active={timeFilter === "All"}
+                onClick={() => setTimeFilter("All")}
+              />
+              {TIMES.map((t) => (
+                <span key={t.key}>
+                  <FilterChip
+                    large
+                    label={timeChipLabel(t)}
+                    active={timeFilter === t.key}
+                    onClick={() => setTimeFilter(t.key)}
+                  />
+                </span>
+              ))}
+              <FilterChip
+                large
+                label="Needs people"
+                active={needsOnly}
+                onClick={() => setNeedsOnly(!needsOnly)}
+              />
+              <FilterChip
+                large
+                label={`Needs ${ME.primaryBadge}`}
+                active={needsMathOnly}
+                onClick={() => setNeedsMathOnly(!needsMathOnly)}
+              />
+            </Row>
+
+            <Row gap={8} align="center" wrap>
+              <Text size="small" weight="semibold">
+                Suggested
+              </Text>
+              {shortcuts.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => pickSlot(s)}
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: 8,
+                    border: `1px solid ${theme.stroke.secondary}`,
+                    background: theme.bg.chrome,
+                    cursor: "pointer",
+                  }}
+                >
+                  <Row gap={6} align="center">
+                    <Text size="small" weight="semibold">
+                      {s.day} {s.time.split("–")[0]}
+                    </Text>
+                    <Text size="small" tone="secondary">
+                      {s.facilitators.length}/{s.max}
+                    </Text>
+                    {(disciplineFit(s) === "missing" ||
+                      disciplineFit(s) === "low") && (
+                      <DisciplineFitIcon color={theme.accent.primary} />
+                    )}
+                  </Row>
+                </button>
+              ))}
+            </Row>
+          </Stack>
+
+          <div
+            style={{
+              borderRadius: 10,
+              border: `1px solid ${gridLine}`,
+              overflow: "hidden",
+            }}
+          >
+            <Row
+              gap={0}
+              style={{ background: headerBg, borderBottom: `1px solid ${gridLine}` }}
+            >
+              <div
+                style={{
+                  width: 56,
+                  padding: "10px 8px",
+                  background: timeColBg,
+                  borderRight: `1px solid ${gridLine}`,
+                }}
+              >
+                <Text size="small" weight="semibold">
+                  Time
+                </Text>
+              </div>
+              {DAYS.map((d) => (
+                <div
+                  key={d}
+                  style={{
+                    flex: 1,
+                    padding: "10px 6px",
+                    textAlign: "center",
+                    borderRight: `1px solid ${gridLine}`,
+                  }}
+                >
+                  <Text size="small" weight="semibold">
+                    {d}
+                  </Text>
+                </div>
+              ))}
+            </Row>
+            {TIMES.map((t) => {
+              if (timeFilter !== "All" && timeFilter !== t.key) return null;
+              return (
+                <div key={t.key} style={{ borderBottom: `1px solid ${gridLine}` }}>
+                  <Row gap={0} align="stretch">
+                    <div
+                      style={{
+                        width: 56,
+                        padding: "12px 8px",
+                        background: timeColBg,
+                        borderRight: `1px solid ${gridLine}`,
+                      }}
+                    >
+                      <Text size="small" tone="secondary">
+                        {t.label}
+                      </Text>
+                    </div>
+                    {DAYS.map((d) => {
+                      if (dayFilter !== "All" && dayFilter !== d) {
+                        return (
+                          <div
+                            key={d}
+                            style={{
+                              flex: 1,
+                              borderRight: `1px solid ${gridLine}`,
+                              minHeight: 76,
+                            }}
+                          />
+                        );
+                      }
+                      const slot = slotAt(d, t.key);
+                      const isCurrent =
+                        !!slot &&
+                        slot.day === currentShift.day &&
+                        slot.timeKey === currentShift.timeKey;
+                      return (
+                        <div
+                          key={d}
+                          style={{
+                            flex: 1,
+                            padding: 6,
+                            borderRight: `1px solid ${gridLine}`,
+                            display: "flex",
+                          }}
+                        >
+                          <GridCell
+                            slot={slot}
+                            selected={!!slot && selected === slot.id}
+                            dimmed={cellDimmed(slot)}
+                            isCurrent={isCurrent}
+                            onPick={pickSlot}
+                          />
+                        </div>
+                      );
+                    })}
+                  </Row>
+                </div>
+              );
+            })}
+          </div>
+
+          {selectedSlot && (
+            <Card>
+              <CardHeader>
+                Target · {selectedSlot.day} {selectedSlot.time} ·{" "}
+                {selectedSlot.locationCode}
+              </CardHeader>
+              <CardBody>
+                <Stack gap={10}>
+                  <UsageBar
+                    total={Math.max(selectedSlot.max, selectedCount)}
+                    topLeftLabel="Capacity"
+                    topRightLabel={`${selectedCount} / ${selectedSlot.max}`}
+                    segments={[
+                      {
+                        id: "filled",
+                        value: selectedCount,
+                        color: LEVEL_COLOR[bandFromCount(selectedCount, selectedSlot.max)],
+                      },
+                    ]}
+                  />
+
+                  {overCapWarning && (
+                    <Callout tone="warning" title="At or over hard cap (10)">
+                      PLF self-swap is blocked here. Admin/SSP can still
+                      override with an explicit warning.
+                      <Row gap={8} style={{ marginTop: 8 }}>
+                        <Pill
+                          size="sm"
+                          active={ackOverCap}
+                          onClick={() => setAckOverCap(!ackOverCap)}
+                        >
+                          Admin: acknowledge & allow
+                        </Pill>
+                      </Row>
+                    </Callout>
+                  )}
+
+                  <Stack gap={6}>
+                    <Text size="small" weight="semibold">
+                      Facilitators ({selectedCount})
+                    </Text>
+                    {selectedSlot.facilitators.slice(0, 6).map((f) => (
+                      <div
+                        key={f.name}
+                        style={{
+                          padding: "8px 10px",
+                          borderRadius: 8,
+                          border: `1px solid ${theme.stroke.tertiary}`,
+                        }}
+                      >
+                        <Row gap={8} align="center" wrap>
+                          <Text size="small" weight="semibold">
+                            {f.name}
+                          </Text>
+                          <Spacer />
+                          {f.badges.map((b) => (
+                            <span key={`${f.name}-${b}`}>
+                              <Pill size="sm">
+                                {DISCIPLINE_ICON[b] ?? "·"} {b}
+                              </Pill>
+                            </span>
+                          ))}
+                        </Row>
+                      </div>
+                    ))}
+                    {selectedCount > 6 && (
+                      <Text size="small" tone="secondary">
+                        +{selectedCount - 6} more
+                      </Text>
+                    )}
+                  </Stack>
+
+                  {!confirmed ? (
+                    <Row gap={8} wrap>
+                      <Button
+                        variant="primary"
+                        disabled={overCapWarning && !ackOverCap}
+                        onClick={() => setConfirmed(true)}
+                      >
+                        Confirm swap
+                      </Button>
+                      <Button variant="ghost" onClick={() => setSelected(null)}>
+                        Clear
+                      </Button>
+                    </Row>
+                  ) : (
+                    <Callout tone="success" title="Swap applied">
+                      Leave + Join recorded. In-app message sent.
+                      <Row gap={8} style={{ marginTop: 10 }}>
+                        <Button
+                          variant="secondary"
+                          onClick={() => {
+                            setConfirmed(false);
+                            setSelected(null);
+                          }}
+                        >
+                          Reset mock
+                        </Button>
+                      </Row>
+                    </Callout>
+                  )}
+                </Stack>
+              </CardBody>
+            </Card>
+          )}
+        </Stack>
+      )}
+
+      {screen === "ssp" && (
+        <Stack gap={14}>
+          <H2>Admin Overrides</H2>
+          <Callout tone="neutral" title="Over hard cap">
+            Main roster edits and admin swaps may exceed 10 (e.g. 13/10 on the
+            grid). Show a warning on swap/add-on; do not hard-block admins.
+          </Callout>
+          <Grid columns={2} gap={12}>
+            <Card>
+              <CardHeader>Assign override</CardHeader>
+              <CardBody>
+                <Stack gap={10}>
+                  <Table
+                    headers={["Field", "Value"]}
+                    rows={[
+                      ["Select PLF", "Taylor Chen (PLF)"],
+                      ["Week", "Week 6 (Current)"],
+                      ["Target slot", "Wed 14:00–16:00 · GP-V714 (13/10)"],
+                    ]}
+                  />
+                  <Row gap={8} wrap>
+                    <Pill
+                      active={leaveOriginal}
+                      onClick={() => setLeaveOriginal(true)}
+                    >
+                      Swap (default)
+                    </Pill>
+                    <Pill
+                      active={!leaveOriginal}
+                      onClick={() => setLeaveOriginal(false)}
+                    >
+                      Add-on
+                    </Pill>
+                  </Row>
+                  <Button variant="primary">Apply override</Button>
+                </Stack>
+              </CardBody>
+            </Card>
+
+            <Card>
+              <CardHeader>Active this week</CardHeader>
+              <CardBody>
+                <Table
+                  headers={["PLF", "Action", "Slot", "Assigned by"]}
+                  rows={OVERRIDES.map((o) => [
+                    o.plf,
+                    <span key={`${o.plf}-act`}>
+                      <ActionCell row={o} />
+                    </span>,
+                    o.kind === "swap"
+                      ? `${o.fromSlot} → ${o.toSlot}`
+                      : o.kind === "leaveOnly"
+                        ? o.fromSlot ?? ""
+                        : o.toSlot,
+                    o.assignedBy,
+                  ])}
+                />
+              </CardBody>
+            </Card>
+          </Grid>
+        </Stack>
+      )}
+
+      {screen === "flow" && (
+        <Table
+          headers={["Rule", "Behaviour"]}
+          rows={[
+            [
+              "Bands",
+              "Needs (green) · Available (yellow) · Covered (orange) · Full (red, always n/max)",
+            ],
+            [
+              "Hard cap 10",
+              "Blocks PLF self-swap only; display can show 13/10",
+            ],
+            [
+              "Admin",
+              "Roster + swap overrides may exceed; warn on swap UI",
+            ],
+            ["Admin table", "Leave→Join colours; no Status column"],
+          ]}
+        />
+      )}
+
+      {screen === "reqs" && (
+        <Table
+          headers={["Ask", "Done"]}
+          rows={[
+            ["Larger pronounced filters", "Yes"],
+            ["Shaded day header + grid lines", "Yes"],
+            ["Smaller current-shift box", "Yes"],
+            ["Almost full → Covered; mid → OK", "Yes"],
+            ["Over-cap display + admin warning", "Yes"],
+            ["Leave→Join colours; drop Status", "Yes"],
+          ]}
+        />
+      )}
+    </Stack>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<AbsenceReallocationPoc />);
+  </script>
+</body>
+</html>
