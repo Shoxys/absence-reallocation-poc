@@ -3,18 +3,25 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Absence Reallocation POC</title>
+  <title>Absence Reallocation — Phase 1 Prototype</title>
   <style>
     * { box-sizing: border-box; }
+    html, body { height: 100%; }
     body {
       margin: 0;
       font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
-      background: #f5f6f8;
-      color: #111827;
+      background: #F6F8FA;
+      color: #1B2430;
       line-height: 1.45;
     }
-    #root { min-height: 100vh; }
+    #root {
+      min-height: 100vh;
+      min-height: 100dvh;
+      width: 100%;
+    }
     button { font-family: inherit; }
+    summary { list-style: none; }
+    summary::-webkit-details-marker { display: none; }
   </style>
   <script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
@@ -23,26 +30,50 @@
 <body>
   <div id="root"></div>
   <script type="text/babel" data-presets="react">
-const { useState } = React;
+const { useState, useEffect } = React;
 
-/* ── Light theme (replaces useHostTheme) ── */
-const theme = {
+/* Shared keyed state — mirrors Cursor useCanvasState across components */
+const __canvasStore = new Map();
+const __canvasListeners = new Map();
+
+function useCanvasState(key, initial) {
+  const init =
+    typeof initial === "function" ? initial : () => initial;
+  if (!__canvasStore.has(key)) {
+    __canvasStore.set(key, init());
+  }
+  const [value, setLocal] = useState(() => __canvasStore.get(key));
+  useEffect(() => {
+    const bump = (next) => setLocal(next);
+    let set = __canvasListeners.get(key);
+    if (!set) {
+      set = new Set();
+      __canvasListeners.set(key, set);
+    }
+    set.add(bump);
+    setLocal(__canvasStore.get(key));
+    return () => set.delete(bump);
+  }, [key]);
+  const setValue = (action) => {
+    const prev = __canvasStore.get(key);
+    const next = typeof action === "function" ? action(prev) : action;
+    __canvasStore.set(key, next);
+    const set = __canvasListeners.get(key);
+    if (set) for (const fn of set) fn(next);
+  };
+  return [value, setValue];
+}
+
+/* Host theme stand-in (canvas useHostTheme) */
+const hostTheme = {
   kind: "light",
-  accent: { primary: "#2563eb" },
-  stroke: { secondary: "#d0d5dd", tertiary: "#e4e7ec" },
-  fill: { primary: "#dbeafe", tertiary: "#e4eaf0", quaternary: "#eceff2" },
-  bg: { elevated: "#ffffff", editor: "#f8f9fb", chrome: "#f3f4f6" },
-  text: { primary: "#111827", secondary: "#4b5563", tertiary: "#6b7280" },
+  accent: { primary: "#1F6FBF" },
+  stroke: { secondary: "#E4E9EF", tertiary: "#EEF1F5" },
+  fill: { primary: "#EEF5FC", tertiary: "#E4EAF0", quaternary: "#eceff2" },
+  bg: { elevated: "#ffffff", editor: "#F6F8FA", chrome: "#F6F8FA" },
+  text: { primary: "#1B2430", secondary: "#5A6572", tertiary: "#8B95A1" },
 };
 
-const LEVEL_HEX = {
-  green: "#2f7a4a",
-  yellow: "#b8941f",
-  orange: "#c45f1a",
-  red: "#a04040",
-};
-
-/* ── Tiny UI primitives (replaces cursor/canvas) ── */
 function Stack({ gap = 8, children, style }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap, ...style }}>
@@ -78,7 +109,7 @@ function Divider() {
     <hr
       style={{
         border: "none",
-        borderTop: `1px solid ${theme.stroke.secondary}`,
+        borderTop: `1px solid ${hostTheme.stroke.secondary}`,
         margin: 0,
       }}
     />
@@ -87,35 +118,21 @@ function Divider() {
 
 function H1({ children, style }) {
   return (
-    <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, ...style }}>
+    <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: "#1B2430", ...style }}>
       {children}
     </h1>
   );
 }
 
-function H2({ children, style }) {
-  return (
-    <h2 style={{ margin: 0, fontSize: 18, fontWeight: 650, ...style }}>
-      {children}
-    </h2>
-  );
-}
-
-function Text({
-  children,
-  size = "md",
-  weight = "normal",
-  tone = "primary",
-  style,
-}) {
+function Text({ children, size = "md", weight = "normal", tone = "primary", style }) {
   const fontSize = size === "small" ? 12 : 14;
   const fontWeight = weight === "semibold" ? 600 : 400;
   const color =
     tone === "secondary"
-      ? theme.text.secondary
+      ? hostTheme.text.secondary
       : tone === "tertiary"
-        ? theme.text.tertiary
-        : theme.text.primary;
+        ? hostTheme.text.tertiary
+        : hostTheme.text.primary;
   return (
     <span style={{ fontSize, fontWeight, color, ...style }}>{children}</span>
   );
@@ -130,9 +147,9 @@ function Pill({ children, active, onClick, size = "md" }) {
       style={{
         padding: sm ? "3px 8px" : "6px 12px",
         borderRadius: 999,
-        border: `1.5px solid ${active ? theme.accent.primary : theme.stroke.secondary}`,
-        background: active ? theme.fill.primary : theme.bg.elevated,
-        color: theme.text.primary,
+        border: `1.5px solid ${active ? hostTheme.accent.primary : hostTheme.stroke.secondary}`,
+        background: active ? hostTheme.fill.primary : hostTheme.bg.elevated,
+        color: hostTheme.text.primary,
         fontSize: sm ? 11 : 13,
         fontWeight: active ? 600 : 500,
         cursor: onClick ? "pointer" : "default",
@@ -143,1114 +160,2314 @@ function Pill({ children, active, onClick, size = "md" }) {
   );
 }
 
-function Button({ children, variant = "primary", disabled, onClick }) {
-  const styles = {
-    primary: {
-      background: theme.accent.primary,
-      color: "#fff",
-      border: `1px solid ${theme.accent.primary}`,
-    },
-    secondary: {
-      background: theme.bg.chrome,
-      color: theme.text.primary,
-      border: `1px solid ${theme.stroke.secondary}`,
-    },
-    ghost: {
-      background: "transparent",
-      color: theme.text.secondary,
-      border: `1px solid ${theme.stroke.secondary}`,
-    },
-  };
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      style={{
-        padding: "8px 14px",
-        borderRadius: 8,
-        fontSize: 13,
-        fontWeight: 600,
-        cursor: disabled ? "not-allowed" : "pointer",
-        opacity: disabled ? 0.45 : 1,
-        ...styles[variant],
-      }}
-    >
-      {children}
-    </button>
-  );
-}
-
-function Card({ children }) {
-  return (
-    <div
-      style={{
-        borderRadius: 10,
-        border: `1px solid ${theme.stroke.secondary}`,
-        background: theme.bg.elevated,
-        overflow: "hidden",
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-function CardHeader({ children }) {
-  return (
-    <div
-      style={{
-        padding: "10px 14px",
-        borderBottom: `1px solid ${theme.stroke.tertiary}`,
-        fontSize: 13,
-        fontWeight: 600,
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-function CardBody({ children }) {
-  return <div style={{ padding: 14 }}>{children}</div>;
-}
-
 function Callout({ tone = "info", title, children }) {
   const tones = {
-    info: { bg: "#eff6ff", border: "#93c5fd", title: "#1d4ed8" },
-    success: { bg: "#ecfdf5", border: "#6ee7b7", title: "#047857" },
-    warning: { bg: "#fffbeb", border: "#fcd34d", title: "#b45309" },
-    neutral: { bg: "#f8fafc", border: theme.stroke.secondary, title: theme.text.primary },
+    info: { bg: "#EEF5FC", border: "#BBD9F2", title: "#114A81" },
+    success: { bg: "#EAF6ED", border: "#6BB57A", title: "#2E7D3A" },
+    warning: { bg: "#FFF4EC", border: "#F5C89A", title: "#C45F1A" },
+    neutral: { bg: "#F6F8FA", border: hostTheme.stroke.secondary, title: hostTheme.text.primary },
   };
   const t = tones[tone] || tones.info;
   return (
     <div
       style={{
         padding: "12px 14px",
-        borderRadius: 10,
+        borderRadius: 8,
         border: `1px solid ${t.border}`,
         background: t.bg,
       }}
     >
-      <div style={{ fontWeight: 650, fontSize: 13, color: t.title, marginBottom: 4 }}>
-        {title}
-      </div>
-      <div style={{ fontSize: 13, color: theme.text.secondary }}>{children}</div>
-    </div>
-  );
-}
-
-function Table({ headers, rows }) {
-  return (
-    <div style={{ overflowX: "auto", borderRadius: 10, border: `1px solid ${theme.stroke.secondary}` }}>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-        <thead>
-          <tr style={{ background: theme.fill.tertiary }}>
-            {headers.map((h) => (
-              <th
-                key={h}
-                style={{
-                  textAlign: "left",
-                  padding: "10px 12px",
-                  borderBottom: `1px solid ${theme.stroke.secondary}`,
-                  fontWeight: 600,
-                }}
-              >
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, i) => (
-            <tr key={i} style={{ background: i % 2 ? theme.bg.editor : theme.bg.elevated }}>
-              {row.map((cell, j) => (
-                <td
-                  key={j}
-                  style={{
-                    padding: "10px 12px",
-                    borderBottom: `1px solid ${theme.stroke.tertiary}`,
-                    verticalAlign: "top",
-                  }}
-                >
-                  {cell}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function Grid({ columns = 2, gap = 12, children }) {
-  return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
-        gap,
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-function UsageBar({ total, topLeftLabel, topRightLabel, segments }) {
-  const filled = segments.reduce((s, seg) => s + seg.value, 0);
-  const pct = total > 0 ? Math.min(100, (filled / total) * 100) : 0;
-  const color = LEVEL_HEX[segments[0]?.color] || theme.accent.primary;
-  return (
-    <div>
-      <Row gap={8} style={{ marginBottom: 6 }}>
-        <Text size="small" weight="semibold">{topLeftLabel}</Text>
-        <Spacer />
-        <Text size="small" tone="secondary">{topRightLabel}</Text>
-      </Row>
-      <div
-        style={{
-          height: 10,
-          borderRadius: 6,
-          background: theme.fill.quaternary,
-          overflow: "hidden",
-        }}
-      >
-        <div
-          style={{
-            width: `${pct}%`,
-            height: "100%",
-            background: color,
-            borderRadius: 6,
-          }}
-        />
+      {title ? (
+        <div style={{ fontWeight: 650, fontSize: 13, color: t.title, marginBottom: 4 }}>
+          {title}
+        </div>
+      ) : null}
+      <div style={{ fontSize: 12, color: hostTheme.text.secondary, lineHeight: 1.45 }}>
+        {children}
       </div>
     </div>
   );
 }
 
-/* ── Domain + mock data (same as canvas) ── */
-const HARD_CAP = 10;
 
-const ME = {
-  badges: ["MATH", "STAT"],
-  primaryBadge: "MATH",
+/**
+ * Phase 1 prototype: interactive UI lab for absence reallocation.
+ *
+ * SOURCE OF TRUTH for Phase 1 UX. Implementation plan:
+ *   ~/.cursor/plans/absence_reallocation_phase_1_a7499538.plan.md
+ * Agent reminder: .cursor/rules/absence-reallocation-phase1.mdc
+ * If you change flows here, update that plan + rule in the same session.
+ *
+ * Static index.html export (on request): keep this file export-ready —
+ * 1) All layout/visual styles are inline (no CSS modules).
+ * 2) Swap useCanvasState → React.useState; drop cursor/canvas imports.
+ * 3) Replace Stack/Row/Text/Pill/Btn/Callout with simple HTML + the same inline styles.
+ * 4) Root shell must stay fluid: width 100%, minWidth 0, flex children with
+ *    flex 1 1 0% / maxWidth soft caps (week grid ~1200, confirm 248–288). Use
+ *    viewport meta + body { margin:0 } so fullscreen monitor / phone frames scale.
+ * 5) Design Variations stays a fixed right strip (~196px); app frame grows beside it.
+ *
+ * Ship defaults (plan): skin C Green Capacity, mathStyle rose, confirmLayout sidebar.
+ * Sticky canvas state may override — use Reset Demo or clear p6_skin4 / p6_math / p6_clayout.
+ */
+const P = {
+    blue800: "#114A81",
+    blue600: "#1F6FBF",
+    blue200: "#BBD9F2",
+    blue50: "#EEF5FC",
+    ink900: "#1B2430",
+    ink600: "#5A6572",
+    ink400: "#8B95A1",
+    line: "#E4E9EF",
+    surface: "#F6F8FA",
+    white: "#FFFFFF",
+    green: "#2E7D3A",
+    greenBorder: "#6BB57A",
+    greenFill: "#EAF6ED",
+    greenDeep: "#D4EBD8",
+    greenMeter: "#4CAF66",
+    warn: "#C45F1A",
+    warnFill: "#FFF4EC",
+    alert: "#B42318",
+    alertFill: "#FEF3F2",
+    rose: "#9F1239",
+    roseFill: "#FFF1F2",
+    sidebar: "#2E3846",
+    sidebarText: "#a7b1c2",
+    sidebarActive: "#1C83C6",
 };
-
+const HARD_CAP = 10;
+/** Demo / static HTML — fixed-height rectangular cells; app chrome hugs content */
+const DEMO_CELL_H = 56;
+const DEMO_CELL_MAX_H = 62;
+const DEMO_GRID_MAX_W = "min(1280px, 100%)";
+const LOC = {
+    gp: "Gardens Point",
+    kg: "Kelvin Grove",
+    online: "Online",
+};
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
 const TIMES = [
-  { key: "10", label: "10:00" },
-  { key: "12", label: "12:00" },
-  { key: "14", label: "14:00" },
-  { key: "16", label: "16:00" },
+    { key: "10", label: "10 AM" },
+    { key: "11", label: "11 AM" },
+    { key: "12", label: "12 PM" },
+    { key: "13", label: "1 PM" },
+    { key: "14", label: "2 PM" },
+    { key: "15", label: "3 PM" },
 ];
-
-const LEVEL_COLOR = {
-  needs: "green",
-  available: "yellow",
-  covered: "orange",
-  full: "red",
+const SKIN_META = {
+    A: {
+        badge: "Soft Green",
+        name: "Soft Green + Meter",
+        group: "Green capacity",
+        pitch: "Open short-staffed cells wash green with a thin fill meter.",
+    },
+    B: {
+        badge: "Green Rail",
+        name: "Green Rail",
+        group: "Green capacity",
+        pitch: "White cell with a thick green left rail on open slots.",
+    },
+    C: {
+        badge: "Green Capacity",
+        name: "Thick Green Capacity",
+        group: "Green capacity",
+        pitch: "Chunky green capacity bar that reads how full the hour is.",
+    },
+    D: {
+        badge: "Green Pips",
+        name: "Green People Pips",
+        group: "Green capacity",
+        pitch: "Ten green dots = capacity; filled dots = people on shift.",
+    },
+    K: {
+        badge: "Soft Blue",
+        name: "Soft Blue + Meter",
+        group: "Blue capacity",
+        pitch: "Same as Soft Green, but open cells wash blue.",
+    },
+    L: {
+        badge: "Blue Cap Rail",
+        name: "Blue Capacity Rail",
+        group: "Blue capacity",
+        pitch: "White cell with a thick blue left rail on open slots.",
+    },
+    M: {
+        badge: "Blue Capacity",
+        name: "Thick Blue Capacity",
+        group: "Blue capacity",
+        pitch: "Chunky blue capacity bar for open short-staffed hours.",
+    },
+    N: {
+        badge: "Blue Pips",
+        name: "Blue People Pips",
+        group: "Blue capacity",
+        pitch: "Ten blue dots = capacity; filled dots = people on shift.",
+    },
+    E: {
+        badge: "Blue→Green",
+        name: "Blue Open to Green Join",
+        group: "Blue open → green select",
+        pitch: "Open cells read blue (actionable). Selected joins turn green.",
+    },
+    F: {
+        badge: "Blue Select Rail",
+        name: "Blue Rail to Green Select",
+        group: "Blue open → green select",
+        pitch: "Blue left rail when open; full green wash when you select to join.",
+    },
+    G: {
+        badge: "Green→Blue",
+        name: "Green Open to Blue Join",
+        group: "Green open → blue select",
+        pitch: "Switched pair of Blue→Green: open stays green; selected joins turn blue.",
+    },
+    H: {
+        badge: "Green Select Rail",
+        name: "Green Rail to Blue Select",
+        group: "Green open → blue select",
+        pitch: "Switched pair of Blue Select Rail: green rail when open; blue when selected.",
+    },
+    I: {
+        badge: "Outline",
+        name: "Outline Open",
+        group: "Extra experiments",
+        pitch: "Open slots use a coloured outline only; select fills solid green.",
+    },
+    J: {
+        badge: "Heat Needs",
+        name: "Heat Needs",
+        group: "Extra experiments",
+        pitch: "Needs People cells are stronger green; Available stay soft.",
+    },
 };
-
-const DISCIPLINE_ICON = {
-  MATH: "∑",
-  STAT: "σ",
-  PHYS: "⚡",
-  CHEM: "⚗",
-  BIO: "✿",
-  ENG: "⚙",
+const MATH_META = {
+    blend: {
+        badge: "Blend",
+        pitch: "Badge tints to the cell colour underneath (green / blue / grey).",
+    },
+    amber: {
+        badge: "Amber",
+        pitch: "Warm orange warning with triangle. Softer than a hard error.",
+    },
+    alert: {
+        badge: "Alert Red",
+        pitch: "High-contrast warning red with triangle. Strongest gap signal.",
+    },
+    rose: {
+        badge: "Rose",
+        pitch: "Deep rose that stays readable on both green and blue washes.",
+    },
 };
-
+const ALL_SKINS = [
+    "A",
+    "B",
+    "C",
+    "D",
+    "K",
+    "L",
+    "M",
+    "N",
+    "E",
+    "F",
+    "G",
+    "H",
+    "I",
+    "J",
+];
+const SKIN_GROUPS = [
+    { title: "Green capacity", skins: ["A", "B", "C", "D"] },
+    { title: "Blue capacity", skins: ["K", "L", "M", "N"] },
+    { title: "Blue open → green select", skins: ["E", "F"] },
+    { title: "Green open → blue select", skins: ["G", "H"] },
+    { title: "Extra experiments", skins: ["I", "J"] },
+];
+const ALL_MATH = ["blend", "amber", "alert", "rose"];
+const PRIMARY_ROSTER = {
+    id: "math",
+    code: "MATH",
+    label: "Mathematics Discipline Roster",
+};
+function selectSchemeOf(skin) {
+    if (skin === "E" || skin === "F" || skin === "I")
+        return "blueOpen";
+    if (skin === "G" || skin === "H")
+        return "greenOpen";
+    return "capacity";
+}
+function capacityToneOf(skin) {
+    if (skin === "K" || skin === "L" || skin === "M" || skin === "N")
+        return "blue";
+    return "green";
+}
+function openAccentOf(skin) {
+    const scheme = selectSchemeOf(skin);
+    if (scheme === "blueOpen")
+        return "blue";
+    if (scheme === "greenOpen")
+        return "green";
+    return capacityToneOf(skin);
+}
+function selectAccentOf(skin) {
+    const scheme = selectSchemeOf(skin);
+    if (scheme === "blueOpen")
+        return "green";
+    if (scheme === "greenOpen")
+        return "blue";
+    // Capacity: opposite of open tone so select still reads clearly
+    return capacityToneOf(skin) === "blue" ? "green" : "blue";
+}
+function bulk(n, badge, prefix) {
+    return Array.from({ length: n }, (_, i) => ({
+        name: `${prefix} ${i + 1}`,
+        badges: [i % 2 === 0 ? badge : "SCI"],
+    }));
+}
+function makeSlot(day, timeKey, start, loc, people) {
+    return { id: `${day.toLowerCase()}-${timeKey}`, day, timeKey, start, loc, people };
+}
 const SLOTS = [
-  {
-    id: "mon-10",
-    day: "Mon",
-    timeKey: "10",
-    time: "10:00–12:00",
-    location: "GP Library L3",
-    locationCode: "GP-V714",
-    max: HARD_CAP,
-    level: "needs",
-    facilitators: [
-      { name: "Sam Lee", badges: ["PHYS", "CHEM"] },
-      { name: "Jordan Park", badges: ["PHYS"] },
-    ],
-  },
-  {
-    id: "mon-14",
-    day: "Mon",
-    timeKey: "14",
-    time: "14:00–16:00",
-    location: "GP Library L3",
-    locationCode: "GP-V714",
-    max: HARD_CAP,
-    level: "available",
-    facilitators: [
-      { name: "Riley Ng", badges: ["MATH", "STAT"] },
-      { name: "Casey Wu", badges: ["MATH"] },
-      { name: "Avery Cole", badges: ["CHEM"] },
-      { name: "Quinn West", badges: ["PHYS"] },
-      { name: "Blake Tran", badges: ["STAT"] },
-      { name: "You", badges: ["MATH", "STAT"] },
-    ],
-  },
-  {
-    id: "tue-10",
-    day: "Tue",
-    timeKey: "10",
-    time: "10:00–12:00",
-    location: "KG Block B",
-    locationCode: "KG-B201",
-    max: HARD_CAP,
-    level: "covered",
-    facilitators: Array.from({ length: 8 }, (_, i) => ({
-      name: `Facilitator ${i + 1}`,
-      badges: i % 2 === 0 ? ["PHYS"] : ["CHEM"],
-    })),
-  },
-  {
-    id: "tue-14",
-    day: "Tue",
-    timeKey: "14",
-    time: "14:00–16:00",
-    location: "GP Library L3",
-    locationCode: "GP-V714",
-    max: HARD_CAP,
-    level: "needs",
-    facilitators: [{ name: "Morgan Ellis", badges: ["MATH", "STAT"] }],
-  },
-  {
-    id: "wed-12",
-    day: "Wed",
-    timeKey: "12",
-    time: "12:00–14:00",
-    location: "GP Library L3",
-    locationCode: "GP-V714",
-    max: HARD_CAP,
-    level: "needs",
-    facilitators: [
-      { name: "Pat Rivera", badges: ["CHEM"] },
-      { name: "Robin Shaw", badges: ["PHYS"] },
-      { name: "Sky Patel", badges: ["BIO"] },
-    ],
-  },
-  {
-    id: "thu-10",
-    day: "Thu",
-    timeKey: "10",
-    time: "10:00–12:00",
-    location: "KG Block B",
-    locationCode: "KG-B201",
-    max: HARD_CAP,
-    level: "available",
-    facilitators: Array.from({ length: 6 }, (_, i) => ({
-      name: `Staff ${i + 1}`,
-      badges: i === 0 ? ["MATH"] : ["PHYS"],
-    })),
-  },
-  {
-    id: "fri-14",
-    day: "Fri",
-    timeKey: "14",
-    time: "14:00–16:00",
-    location: "Online",
-    locationCode: "Online",
-    max: HARD_CAP,
-    level: "covered",
-    facilitators: Array.from({ length: 9 }, (_, i) => ({
-      name: `Facilitator ${i + 1}`,
-      badges: i % 3 === 0 ? ["MATH"] : ["PHYS"],
-    })),
-  },
-  {
-    id: "wed-14",
-    day: "Wed",
-    timeKey: "14",
-    time: "14:00–16:00",
-    location: "GP Library L3",
-    locationCode: "GP-V714",
-    max: HARD_CAP,
-    level: "full",
-    facilitators: Array.from({ length: 13 }, (_, i) => ({
-      name: `Facilitator ${i + 1}`,
-      badges: ["PHYS"],
-    })),
-  },
+    makeSlot("Mon", "10", "10:00 AM", "gp", [
+        { name: "Riley Ng", badges: ["MATH"] },
+        { name: "Casey Wu", badges: ["SCI"] },
+        { name: "Avery Cole", badges: ["SCI"] },
+        { name: "Quinn West", badges: ["ENG"] },
+        { name: "Blake Tran", badges: ["MATH"] },
+    ]),
+    makeSlot("Mon", "11", "11:00 AM", "gp", [
+        { name: "Riley Ng", badges: ["MATH"] },
+        { name: "Casey Wu", badges: ["SCI"] },
+        { name: "Avery Cole", badges: ["SCI"] },
+    ]),
+    makeSlot("Mon", "12", "12:00 PM", "kg", bulk(8, "MATH", "Fac")),
+    makeSlot("Mon", "13", "1:00 PM", "kg", bulk(7, "SCI", "Fac")),
+    makeSlot("Mon", "14", "2:00 PM", "gp", [
+        { name: "You", badges: ["MATH"] },
+        { name: "Olivia D", badges: ["SCI"] },
+        { name: "Zoe D", badges: ["MATH"] },
+        { name: "Hannah W", badges: ["ENG"] },
+        { name: "Elias O", badges: ["SCI"] },
+        { name: "Nurfarahani S", badges: ["SCI"] },
+    ]),
+    makeSlot("Mon", "15", "3:00 PM", "gp", [
+        { name: "You", badges: ["MATH"] },
+        { name: "Olivia D", badges: ["SCI"] },
+        { name: "Zoe D", badges: ["MATH"] },
+        { name: "Hannah W", badges: ["ENG"] },
+    ]),
+    makeSlot("Tue", "10", "10:00 AM", "kg", [
+        { name: "Hamid A", badges: ["SCI"] },
+        { name: "Nathaniel R", badges: ["SCI"] },
+        { name: "Haritha G", badges: ["ENG"] },
+    ]),
+    makeSlot("Tue", "11", "11:00 AM", "kg", [
+        { name: "Hamid A", badges: ["SCI"] },
+        { name: "Nathaniel R", badges: ["SCI"] },
+    ]),
+    makeSlot("Tue", "14", "2:00 PM", "gp", bulk(10, "MATH", "Fac")),
+    makeSlot("Tue", "15", "3:00 PM", "gp", bulk(9, "SCI", "Fac")),
+    makeSlot("Wed", "10", "10:00 AM", "gp", bulk(7, "MATH", "Staff")),
+    makeSlot("Wed", "11", "11:00 AM", "gp", bulk(6, "SCI", "Staff")),
+    makeSlot("Wed", "12", "12:00 PM", "gp", [
+        { name: "Pat Rivera", badges: ["IT"] },
+        { name: "Robin Shaw", badges: ["SCI"] },
+        { name: "Sky Patel", badges: ["ENG"] },
+    ]),
+    makeSlot("Wed", "13", "1:00 PM", "gp", [
+        { name: "Pat Rivera", badges: ["IT"] },
+        { name: "Robin Shaw", badges: ["SCI"] },
+    ]),
+    makeSlot("Wed", "14", "2:00 PM", "online", [
+        { name: "Jenifer N", badges: ["MATH"] },
+        { name: "Riley C", badges: ["SCI"] },
+        { name: "Chelsea H", badges: ["SCI"] },
+        { name: "Louise M", badges: ["MATH"] },
+    ]),
+    makeSlot("Thu", "10", "10:00 AM", "kg", [
+        { name: "You", badges: ["MATH"] },
+        { name: "Rocika W", badges: ["SCI"] },
+        { name: "Malik T", badges: ["SCI"] },
+        { name: "Brandon L", badges: ["ENG"] },
+        { name: "Sophia S", badges: ["MATH"] },
+        { name: "Daisy K", badges: ["SCI"] },
+    ]),
+    makeSlot("Thu", "11", "11:00 AM", "kg", [
+        { name: "You", badges: ["MATH"] },
+        { name: "Rocika W", badges: ["SCI"] },
+        { name: "Malik T", badges: ["SCI"] },
+        { name: "Sophia S", badges: ["MATH"] },
+    ]),
+    makeSlot("Thu", "14", "2:00 PM", "kg", bulk(13, "MATH", "Fac")),
+    makeSlot("Thu", "15", "3:00 PM", "kg", bulk(11, "SCI", "Fac")),
+    makeSlot("Fri", "12", "12:00 PM", "online", [
+        { name: "Kate N", badges: ["SCI"] },
+        { name: "Amber J", badges: ["SCI"] },
+    ]),
+    makeSlot("Fri", "13", "1:00 PM", "online", [{ name: "Kate N", badges: ["SCI"] }]),
+    makeSlot("Fri", "14", "2:00 PM", "gp", [
+        { name: "Felix M", badges: ["MATH"] },
+        { name: "Mason H", badges: ["SCI"] },
+        { name: "Vladyslav L", badges: ["SCI"] },
+        { name: "Reuben T", badges: ["ENG"] },
+        { name: "Iram M", badges: ["IT"] },
+    ]),
+    makeSlot("Fri", "15", "3:00 PM", "gp", [
+        { name: "Felix M", badges: ["MATH"] },
+        { name: "Mason H", badges: ["SCI"] },
+        { name: "Iram M", badges: ["IT"] },
+    ]),
 ];
-
-const OVERRIDES = [
-  {
-    plf: "Alex Kim",
-    kind: "swap",
-    fromSlot: "Mon 14:00–16:00 · GP-V714",
-    toSlot: "Mon 10:00–12:00 · GP-V714",
-    assignedBy: "Self",
-  },
-  {
-    plf: "Sam Lee",
-    kind: "addon",
-    toSlot: "Tue 10:00–12:00 · KG-B201",
-    assignedBy: "SSP Admin",
-  },
-  {
-    plf: "Jordan Park",
-    kind: "leaveOnly",
-    fromSlot: "Fri 10:00–12:00 · Online",
-    toSlot: "—",
-    assignedBy: "SSP Admin",
-  },
+const MY_SHIFTS = ["mon-14", "mon-15", "thu-10", "thu-11"];
+const SEED_OVERRIDES = [
+    {
+        id: 1,
+        plf: "Alex Kim",
+        from: "Mon 2:00 PM · GP",
+        to: "Mon 10:00 AM · GP",
+        by: "Self",
+        hours: 1,
+        status: "active",
+    },
+    {
+        id: 2,
+        plf: "Sam Lee",
+        from: "Tue 2:00 PM · GP + Tue 3:00 PM · GP",
+        to: "Tue 10:00 AM · KG + Wed 12:00 PM · GP",
+        by: "SSP",
+        hours: 2,
+        status: "active",
+    },
 ];
-
-function PeopleIcon({ color }) {
-  return (
-    <svg width="12" height="12" viewBox="0 0 16 16" fill={color} aria-hidden="true">
-      <circle cx="6" cy="5" r="2.2" />
-      <path d="M1.5 13c0-2.2 2-3.5 4.5-3.5S10.5 10.8 10.5 13v1h-9v-1z" />
-      <circle cx="11.5" cy="5.5" r="1.8" opacity="0.85" />
-      <path
-        d="M11 9.2c1.7.2 3.5 1.2 3.5 3v1.3H11"
-        opacity="0.85"
-        fill="none"
-        stroke={color}
-        strokeWidth="1.4"
-      />
-    </svg>
-  );
+const PLF_OPTIONS = ["Taylor Chen", "Alex Kim", "Sam Lee", "Jordan Park", "Priya N"];
+function bandOf(n) {
+    if (n >= HARD_CAP)
+        return "full";
+    const r = n / HARD_CAP;
+    if (r <= 0.35)
+        return "needs";
+    if (r <= 0.65)
+        return "available";
+    return "covered";
 }
-
-function DisciplineFitIcon({ color }) {
-  return (
-    <svg width="11" height="11" viewBox="0 0 16 16" aria-hidden="true">
-      <path
-        d="M8 1.5l1.5 4.2H14l-3.5 2.7 1.3 4.3L8 10.5l-3.8 2.7 1.3-4.3L2 5.7h4.5L8 1.5z"
-        fill={color}
-      />
-    </svg>
-  );
+function promoted(b) {
+    return b === "needs" || b === "available";
 }
-
-function FilterChip({ label, active, onClick, large }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        padding: large ? "7px 12px" : "5px 10px",
-        borderRadius: 999,
-        border: `1.5px solid ${active ? theme.accent.primary : theme.stroke.secondary}`,
-        background: active ? theme.fill.primary : theme.bg.elevated,
-        color: theme.text.primary,
-        fontSize: 12,
-        fontWeight: active ? 600 : 500,
-        cursor: "pointer",
-      }}
-    >
+function slotById(id) {
+    return id ? SLOTS.find((s) => s.id === id) : undefined;
+}
+function hasMath(s) {
+    return s.people.some((p) => p.badges.includes("MATH"));
+}
+function countOf(s, applied) {
+    let n = s.people.length;
+    if (applied) {
+        if (applied.origins.includes(s.id))
+            n -= 1;
+        if (applied.targets.includes(s.id))
+            n += 1;
+    }
+    return n;
+}
+function shortFmt(s) {
+    return `${s.day} ${s.start}`;
+}
+function overrideFmt(s) {
+    return `${s.day} ${s.start} · ${locShort(s.loc)}`;
+}
+function locShort(l) {
+    return l === "gp" ? "GP" : l === "kg" ? "KG" : "Online";
+}
+/* ---------- Icons ---------- */
+function PeopleIcon({ color = P.ink400 }) {
+    return (<svg width="12" height="12" viewBox="0 0 16 16" aria-hidden>
+      <circle cx="6" cy="5" r="2.2" fill={color}/>
+      <path d="M1.5 13c0-2.2 2-3.5 4.5-3.5S10.5 10.8 10.5 13v1h-9v-1z" fill={color}/>
+      <circle cx="11.5" cy="5.5" r="1.8" fill={color} opacity="0.85"/>
+      <path d="M11 9.2c1.7.2 3.5 1.2 3.5 3v1.3H11" fill="none" stroke={color} strokeWidth="1.4" opacity="0.85"/>
+    </svg>);
+}
+function DiscIcon({ code, size = 12 }) {
+    const c = "#6B7280";
+    if (code === "MATH") {
+        return (<svg width={size} height={size} viewBox="0 0 16 16" aria-label="Math">
+        <rect x="2" y="1.5" width="12" height="13" rx="1.5" fill="none" stroke={c} strokeWidth="1.3"/>
+        <rect x="4" y="3.2" width="8" height="2.5" rx="0.4" fill={c} opacity="0.35"/>
+        <circle cx="5.2" cy="8.5" r="0.85" fill={c}/>
+        <circle cx="8" cy="8.5" r="0.85" fill={c}/>
+        <circle cx="10.8" cy="8.5" r="0.85" fill={c}/>
+        <circle cx="5.2" cy="11.5" r="0.85" fill={c}/>
+        <circle cx="8" cy="11.5" r="0.85" fill={c}/>
+        <circle cx="10.8" cy="11.5" r="0.85" fill={c}/>
+      </svg>);
+    }
+    if (code === "ENG") {
+        return (<svg width={size} height={size} viewBox="0 0 16 16" aria-label="English">
+        <rect x="1.5" y="4" width="6" height="6" rx="1" fill="none" stroke={c} strokeWidth="1.2"/>
+        <rect x="8.5" y="4" width="6" height="6" rx="1" fill="none" stroke={c} strokeWidth="1.2"/>
+        <text x="4.5" y="8.6" textAnchor="middle" fontSize="5.5" fill={c} fontWeight="700">A</text>
+        <text x="11.5" y="8.6" textAnchor="middle" fontSize="5.5" fill={c} fontWeight="700">Z</text>
+      </svg>);
+    }
+    if (code === "SCI") {
+        return (<svg width={size} height={size} viewBox="0 0 16 16" aria-label="Science">
+        <circle cx="8" cy="8" r="1.5" fill={c}/>
+        {[0, 60, 120, 180, 240, 300].map((deg) => {
+                const rad = (deg * Math.PI) / 180;
+                return (<circle key={deg} cx={8 + 5.1 * Math.cos(rad)} cy={8 + 5.1 * Math.sin(rad)} r="1.05" fill={c} opacity="0.75"/>);
+            })}
+      </svg>);
+    }
+    if (code === "ART") {
+        return (<svg width={size} height={size} viewBox="0 0 16 16" aria-label="Arts">
+        <path d="M3 13 L9 3 L11 4.2 L5 14.2 Z" fill="none" stroke={c} strokeWidth="1.3" strokeLinejoin="round"/>
+        <path d="M9 3 L12.5 5.5" stroke={c} strokeWidth="1.3" strokeLinecap="round"/>
+      </svg>);
+    }
+    return (<svg width={size} height={size} viewBox="0 0 16 16" aria-label="Academic">
+      <path d="M8 2.5 L14 5.5 L8 8.5 L2 5.5 Z" fill="none" stroke={c} strokeWidth="1.2" strokeLinejoin="round"/>
+      <path d="M4 6.5 V10.5 C4 12 8 13 8 13 S12 12 12 10.5 V6.5" fill="none" stroke={c} strokeWidth="1.2"/>
+    </svg>);
+}
+function CautionMark({ color, size = 11 }) {
+    return (<span aria-hidden style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color,
+            fontSize: size,
+            lineHeight: 1,
+            fontWeight: 700,
+        }}>
+      ⚠
+    </span>);
+}
+function MathNeededBadge(props) {
+    const mathStyle = props.style ?? "blend";
+    const surface = props.surface ?? "neutral";
+    let tone = { fg: P.ink600, bg: "rgba(27,36,48,0.06)" };
+    if (mathStyle === "blend") {
+        tone =
+            surface === "green"
+                ? { fg: P.green, bg: "rgba(46,125,58,0.14)" }
+                : surface === "blue"
+                    ? { fg: P.blue600, bg: "rgba(31,111,191,0.12)" }
+                    : { fg: P.warn, bg: P.warnFill };
+    }
+    else if (mathStyle === "amber") {
+        tone = { fg: P.warn, bg: P.warnFill };
+    }
+    else if (mathStyle === "alert") {
+        tone = { fg: P.alert, bg: P.alertFill };
+    }
+    else {
+        tone = { fg: P.rose, bg: P.roseFill };
+    }
+    if (props.compact) {
+        return (<span title="Needs MATH" style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 16,
+                height: 16,
+                borderRadius: 3,
+                background: tone.bg,
+                color: tone.fg,
+            }}>
+        <CautionMark color={tone.fg} size={11}/>
+      </span>);
+    }
+    return (<span style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 4,
+            fontSize: 9,
+            fontWeight: 600,
+            color: tone.fg,
+            background: tone.bg,
+            borderRadius: 4,
+            padding: "2px 6px",
+            whiteSpace: "nowrap",
+        }}>
+      <CautionMark color={tone.fg} size={11}/>
+      Needs MATH
+    </span>);
+}
+function mathSurfaceOf(f, skin) {
+    if (f.isTarget) {
+        return selectAccentOf(skin) === "green" ? "green" : "blue";
+    }
+    if (promoted(f.band)) {
+        return openAccentOf(skin) === "blue" ? "blue" : "green";
+    }
+    return "neutral";
+}
+/* ---------- Atoms ---------- */
+function Chip(props) {
+    const { label, active, onClick } = props;
+    return (<button type="button" onClick={onClick} style={{
+            fontSize: 12,
+            fontWeight: active ? 600 : 500,
+            padding: "5px 11px",
+            borderRadius: 6,
+            border: `1px solid ${active ? P.blue600 : P.line}`,
+            background: active ? P.blue50 : P.white,
+            color: active ? P.blue600 : P.ink600,
+            cursor: onClick ? "pointer" : "default",
+        }}>
       {label}
-    </button>
-  );
+    </button>);
 }
-
-function disciplineFit(slot) {
-  const n = slot.facilitators.filter((f) =>
-    f.badges.some((b) => ME.badges.includes(b))
-  ).length;
-  if (n === 0) return "missing";
-  if (n === 1) return "low";
-  return "coveredDisc";
+function Btn(props) {
+    const { children, variant = "ghost", disabled, onClick } = props;
+    const styles = variant === "primary"
+        ? { bg: P.blue600, fg: P.white, bd: P.blue600 }
+        : variant === "danger"
+            ? { bg: P.white, fg: "#C42A1E", bd: P.line }
+            : { bg: P.white, fg: P.ink600, bd: P.line };
+    return (<button type="button" disabled={disabled} onClick={onClick} style={{
+            fontSize: 12,
+            fontWeight: variant === "primary" ? 600 : 500,
+            padding: "7px 14px",
+            borderRadius: 6,
+            border: `1px solid ${styles.bd}`,
+            background: styles.bg,
+            color: styles.fg,
+            cursor: disabled ? "not-allowed" : "pointer",
+            opacity: disabled ? 0.45 : 1,
+        }}>
+      {children}
+    </button>);
 }
-
-function borderColor(level) {
-  switch (level) {
-    case "needs":
-      return "#2f7a4a";
-    case "available":
-      return "#b8941f";
-    case "covered":
-      return "#c45f1a";
-    case "full":
-      return "#a04040";
-  }
+function CountWithPeople({ count, muted }) {
+    const color = muted ? P.ink400 : P.ink900;
+    return (<span style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 4,
+            fontSize: 12,
+            fontWeight: 700,
+            color,
+            fontVariantNumeric: "tabular-nums",
+        }}>
+      <PeopleIcon color={muted ? P.ink400 : P.ink600}/>
+      {count}/{HARD_CAP}
+    </span>);
 }
-
-function softFill(level) {
-  switch (level) {
-    case "needs":
-      return "#e8f6ee";
-    case "available":
-      return "#faf4dc";
-    case "covered":
-      return "#fceee4";
-    case "full":
-      return "#f6e8e8";
-  }
+function ThinMeter({ count, on, accent }) {
+    const fill = !on ? P.ink400 : accent === "blue" ? P.blue600 : P.greenMeter;
+    return (<div style={{ height: 3, background: P.line, borderRadius: 2, overflow: "hidden" }}>
+      <div style={{
+            height: 3,
+            width: `${Math.min((count / HARD_CAP) * 100, 100)}%`,
+            background: fill,
+        }}/>
+    </div>);
 }
-
-function slotAt(day, timeKey) {
-  return SLOTS.find((s) => s.day === day && s.timeKey === timeKey);
+function ThickMeter({ count, on, accent }) {
+    const fill = !on ? "#C5CAD1" : accent === "blue" ? P.blue600 : P.greenMeter;
+    return (<div style={{ height: 8, background: P.line, borderRadius: 3, overflow: "hidden" }}>
+      <div style={{
+            height: 8,
+            width: `${Math.min((count / HARD_CAP) * 100, 100)}%`,
+            background: fill,
+            borderRadius: 3,
+        }}/>
+    </div>);
 }
-
-function bandFromCount(count, max) {
-  if (count >= max) return "full";
-  const r = count / max;
-  if (r <= 0.35) return "needs";
-  if (r <= 0.65) return "available";
-  return "covered";
+function PeoplePips({ count, accent }) {
+    const fill = accent === "blue" ? P.blue600 : P.greenMeter;
+    return (<div style={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+      {Array.from({ length: HARD_CAP }, (_, i) => (<div key={i} style={{
+                width: 5,
+                height: 5,
+                borderRadius: 1,
+                background: i < Math.min(count, HARD_CAP) ? fill : P.line,
+            }}/>))}
+    </div>);
 }
-
-function shortcutRank(slot) {
-  const level = bandFromCount(slot.facilitators.length, slot.max);
-  const staff =
-    level === "needs" ? 0 : level === "available" ? 1 : level === "covered" ? 2 : 3;
-  const disc =
-    disciplineFit(slot) === "missing"
-      ? 0
-      : disciplineFit(slot) === "low"
-        ? 1
-        : 2;
-  return staff * 10 + disc;
-}
-
-function levelLabel(level) {
-  switch (level) {
-    case "needs":
-      return "Needs";
-    case "available":
-      return "Available";
-    case "covered":
-      return "Covered";
-    case "full":
-      return "Full";
-  }
-}
-
-function GridCell({ slot, selected, dimmed, isCurrent, onPick }) {
-  if (!slot) {
-    return (
-      <div
-        style={{
-          flex: 1,
-          minHeight: 68,
-          borderRadius: 8,
-          border: `1px solid ${theme.stroke.tertiary}`,
-          background: theme.bg.editor,
-        }}
-      />
-    );
-  }
-
-  const count = slot.facilitators.length;
-  const level = bandFromCount(count, slot.max);
-  const disabledForPlfSwap = count >= HARD_CAP;
-  const fit = disciplineFit(slot);
-  const showFit = !disabledForPlfSwap && (fit === "missing" || fit === "low");
-  const accent = borderColor(level);
-  const border = selected
-    ? theme.accent.primary
-    : isCurrent
-      ? theme.accent.primary
-      : accent;
-
-  return (
-    <div
-      role="button"
-      title={`${levelLabel(level)} · ${count}/${slot.max}${
-        count > slot.max ? " (over soft max)" : ""
-      }${showFit ? ` · Needs ${ME.primaryBadge}` : ""}`}
-      onClick={() => {
-        if (!dimmed && !(disabledForPlfSwap && !selected)) onPick(slot);
-      }}
-      style={{
-        flex: 1,
-        minHeight: 68,
-        borderRadius: 8,
-        border: `2px ${isCurrent && !selected ? "dashed" : "solid"} ${border}`,
-        background: isCurrent && !selected ? theme.bg.elevated : softFill(level),
-        opacity: dimmed ? 0.25 : disabledForPlfSwap && level === "full" ? 0.55 : 1,
-        cursor: dimmed ? "default" : "pointer",
-        padding: "8px 10px",
-      }}
-    >
-      {level === "full" && !isCurrent ? (
+function FacilitatorsInline({ people }) {
+    // Collapsed: first names + clickable "+N more". Expand to list everyone.
+    const maxNames = 3;
+    const show = people.slice(0, maxNames);
+    const rest = people.length - show.length;
+    if (people.length === 0) {
+        return (<div style={{ fontSize: 11, color: P.ink400, lineHeight: 1.35 }}>No facilitators</div>);
+    }
+    if (rest <= 0) {
+        return (<div style={{
+                fontSize: 11,
+                color: P.ink600,
+                lineHeight: 1.35,
+                wordBreak: "break-word",
+            }}>
+        {show.map((p) => p.name).join(", ")}
+      </div>);
+    }
+    return (<details style={{ fontSize: 11, color: P.ink600, lineHeight: 1.35, minWidth: 0 }}>
+      <summary style={{
+            cursor: "pointer",
+            listStyle: "none",
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "baseline",
+            gap: 4,
+        }}>
+        <span style={{ minWidth: 0 }}>{show.map((p) => p.name).join(", ")}</span>
+        <span style={{
+            color: P.blue600,
+            fontWeight: 700,
+            whiteSpace: "nowrap",
+            textDecoration: "underline",
+            textUnderlineOffset: 2,
+        }}>
+          +{rest} more
+        </span>
+      </summary>
+      <div style={{
+            marginTop: 6,
+            padding: "6px 8px",
+            background: P.surface,
+            border: `1px solid ${P.line}`,
+            borderRadius: 6,
+        }}>
         <Stack gap={3}>
-          <Row gap={5} align="center">
-            <PeopleIcon color={theme.text.secondary} />
-            <Text size="small" weight="semibold">
-              {count}/{slot.max}
-            </Text>
-          </Row>
-          <Text size="small" weight="semibold" style={{ color: accent }}>
-            Full
+          {people.map((p) => (<div key={p.name}>
+              <Row gap={6} align="center">
+                <Text size="small" style={{ color: P.ink900 }}>
+                  {p.name}
+                </Text>
+                <Text size="small" tone="tertiary">
+                  {p.badges.join(" · ")}
+                </Text>
+              </Row>
+            </div>))}
+          <Text size="small" tone="tertiary">
+            Click +N more again to collapse
           </Text>
         </Stack>
-      ) : (
-        <Stack gap={3}>
-          <Row gap={5} align="center">
-            <PeopleIcon color={theme.text.secondary} />
-            <Text size="small" weight="semibold">
-              {count}/{slot.max}
-            </Text>
-            {showFit && (
-              <span title={`Needs ${ME.primaryBadge}`}>
-                <DisciplineFitIcon color={theme.accent.primary} />
-              </span>
-            )}
-          </Row>
-          <Text
-            size="small"
-            weight="semibold"
-            style={{ color: isCurrent && !selected ? theme.accent.primary : accent }}
-          >
-            {isCurrent && !selected ? "Current" : levelLabel(level)}
-          </Text>
-        </Stack>
-      )}
-    </div>
-  );
+      </div>
+    </details>);
 }
-
-function ActionCell({ row }) {
-  const leaveColor = "#a04040";
-  const joinColor = "#2f7a4a";
-
-  if (row.kind === "swap") {
-    return (
+function EmptySlot({ label }) {
+    return (<span style={{
+            fontSize: 11,
+            color: P.ink400,
+            border: `1.5px dashed ${P.line}`,
+            borderRadius: 6,
+            padding: "4px 10px",
+            minWidth: 72,
+            textAlign: "center",
+        }}>
+      {label}
+    </span>);
+}
+function FilledChip(props) {
+    const leave = props.kind === "leave";
+    return (<button type="button" onClick={props.locked ? undefined : props.onRemove} title={props.locked ? "At Least One Shift Must Stay Selected" : "Remove"} style={{
+            fontSize: 12,
+            fontWeight: 600,
+            color: leave ? P.blue800 : P.blue600,
+            background: leave ? P.white : P.blue50,
+            border: leave ? `1.5px dashed ${P.blue600}` : `1.5px solid ${P.blue600}`,
+            borderRadius: 6,
+            padding: "4px 8px",
+            cursor: props.locked ? "not-allowed" : "pointer",
+            opacity: props.locked ? 0.7 : 1,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+        }}>
+      <span style={{
+            width: 14,
+            height: 14,
+            borderRadius: 8,
+            background: leave ? P.blue800 : P.blue600,
+            color: P.white,
+            fontSize: 9,
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+        }}>
+        {props.index}
+      </span>
+      {props.label}
+      {!props.locked && <span style={{ opacity: 0.55 }}>×</span>}
+    </button>);
+}
+function cellChrome(f, skin) {
+    const scheme = selectSchemeOf(skin);
+    const open = openAccentOf(skin);
+    const sel = selectAccentOf(skin);
+    const capTone = capacityToneOf(skin);
+    if (f.isOrigin) {
+        return { bg: P.white, border: `2px dashed ${P.blue800}`, opacity: 1 };
+    }
+    if (f.isMine) {
+        return {
+            bg: P.white,
+            border: `1.5px dashed ${P.blue600}`,
+            opacity: 1,
+        };
+    }
+    if (f.isTarget) {
+        if (sel === "green") {
+            return { bg: P.greenFill, border: `2px solid ${P.green}`, opacity: 1 };
+        }
+        return { bg: P.blue50, border: `2px solid ${P.blue600}`, opacity: 1 };
+    }
+    if (f.band === "full") {
+        return { bg: P.surface, border: `1px solid ${P.line}`, opacity: 0.4 };
+    }
+    if (promoted(f.band)) {
+        if (skin === "I") {
+            return {
+                bg: P.white,
+                border: `1.5px solid ${open === "blue" ? P.blue600 : P.green}`,
+                opacity: 1,
+            };
+        }
+        if (skin === "J") {
+            if (f.band === "needs") {
+                return { bg: P.greenDeep, border: `2px solid ${P.green}`, opacity: 1 };
+            }
+            return { bg: P.greenFill, border: `1px solid ${P.greenBorder}`, opacity: 1 };
+        }
+        if (skin === "E" || skin === "G" || skin === "A" || skin === "K") {
+            return open === "blue"
+                ? { bg: P.blue50, border: `1.5px solid ${P.blue200}`, opacity: 1 }
+                : { bg: P.greenFill, border: `1.5px solid ${P.greenBorder}`, opacity: 1 };
+        }
+        if (skin === "F" || skin === "H" || skin === "B" || skin === "L") {
+            return { bg: P.white, border: `1px solid ${P.line}`, opacity: 1 };
+        }
+        if (scheme === "capacity") {
+            return capTone === "blue"
+                ? { bg: P.blue50, border: `1.5px solid ${P.blue200}`, opacity: 1 }
+                : { bg: P.greenFill, border: `1.5px solid ${P.greenBorder}`, opacity: 1 };
+        }
+    }
+    return {
+        bg: f.band === "covered" ? P.surface : P.white,
+        border: `1px solid ${P.line}`,
+        opacity: 1,
+    };
+}
+function CellBody(props) {
+    const { f, skin, loc, compact, mathStyle = "blend" } = props;
+    const on = promoted(f.band);
+    const openAcc = openAccentOf(skin);
+    const selAcc = selectAccentOf(skin);
+    const accent = f.isTarget ? selAcc : openAcc;
+    const mathSurf = mathSurfaceOf(f, skin);
+    const railColor = f.isTarget
+        ? selAcc === "green"
+            ? P.green
+            : P.blue600
+        : openAcc === "blue"
+            ? P.blue600
+            : P.greenMeter;
+    const showRail = (skin === "B" || skin === "L" || skin === "F" || skin === "H") &&
+        (on || f.isTarget) &&
+        !f.isMine &&
+        !f.isOrigin;
+    const showThin = skin === "A" || skin === "K" || skin === "E" || skin === "G";
+    const showThick = skin === "C" || skin === "M" || skin === "J";
+    const showPips = skin === "D" || skin === "N";
+    const indexBg = selAcc === "green" ? P.green : P.blue600;
+    if (f.isOrigin) {
+        return (<Stack gap={compact ? 0 : 2} style={{ minHeight: compact ? 28 : 44, justifyContent: "center" }}>
+        <Row gap={3} align="center">
+          <span style={{
+                width: compact ? 12 : 14,
+                height: compact ? 12 : 14,
+                borderRadius: 8,
+                background: P.blue800,
+                color: P.white,
+                fontSize: 8,
+                fontWeight: 700,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+            }}>
+            {f.originIndex}
+          </span>
+          <Text size="small" style={{ color: P.blue800, fontSize: compact ? 10 : undefined }} weight="semibold">
+            {compact ? "Leave" : "Leaving"}
+          </Text>
+        </Row>
+        {!compact && (<Text size="small" tone="tertiary">
+            {f.canUndoLeave ? "Tap To Undo" : "Required"}
+          </Text>)}
+      </Stack>);
+    }
+    if (f.isMine) {
+        return (<Stack gap={compact ? 0 : 2} style={{ minHeight: compact ? 28 : 44, justifyContent: "center" }}>
+        <Text size="small" style={{ color: P.blue600, fontSize: compact ? 10 : undefined }} weight="semibold">
+          {compact ? "Yours" : "Your Shift"}
+        </Text>
+        {!compact && (<Text size="small" tone="tertiary">
+            Tap To Leave
+          </Text>)}
+      </Stack>);
+    }
+    if (compact) {
+        return (<Stack gap={1} style={{ minHeight: 28, justifyContent: "center" }}>
+        <Row gap={2} align="center">
+          <Text size="small" weight="semibold" style={{ color: f.band === "full" ? P.ink400 : P.ink900, fontSize: 11 }}>
+            {f.count}/{HARD_CAP}
+          </Text>
+          {f.isTarget && (<span style={{
+                    fontSize: 8,
+                    fontWeight: 700,
+                    color: P.white,
+                    background: indexBg,
+                    borderRadius: 8,
+                    width: 14,
+                    height: 14,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                }}>
+              {f.targetIndex}
+            </span>)}
+          {f.gap && on && (<MathNeededBadge compact surface={mathSurf} style={mathStyle}/>)}
+        </Row>
+        {showThin && <ThinMeter count={f.count} on={on || f.isTarget} accent={accent}/>}
+        {showRail && (<div style={{
+                    position: "absolute",
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: 3,
+                    background: railColor,
+                    borderRadius: "4px 0 0 4px",
+                }}/>)}
+      </Stack>);
+    }
+    return (<Stack gap={showThick || showPips ? 4 : 2}>
       <Row gap={4} align="center">
-        <Text size="small" weight="semibold" style={{ color: leaveColor }}>
-          Leave
+        <CountWithPeople count={f.count} muted={f.band === "full"}/>
+        {f.isTarget && (<span style={{
+                fontSize: 9,
+                fontWeight: 700,
+                color: P.white,
+                background: indexBg,
+                borderRadius: 10,
+                width: 16,
+                height: 16,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+            }}>
+            {f.targetIndex}
+          </span>)}
+      </Row>
+      {showThin && <ThinMeter count={f.count} on={on || f.isTarget} accent={accent}/>}
+      {showThick && <ThickMeter count={f.count} on={on || f.isTarget} accent={accent}/>}
+      {showPips && <PeoplePips count={f.count} accent={accent}/>}
+      {showRail && (<div style={{
+                position: "absolute",
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width: 4,
+                background: railColor,
+                borderRadius: "5px 0 0 5px",
+            }}/>)}
+      {f.band === "full" ? (<Text size="small" tone="tertiary">Full</Text>) : f.gap && (on || f.isTarget) ? (<MathNeededBadge surface={mathSurf} style={mathStyle}/>) : (<Text size="small" tone="tertiary">{locShort(loc)}</Text>)}
+    </Stack>);
+}
+function GridCell(props) {
+    const { slot, applied, origins, targets, phase, skin, mathStyle = "blend", hidden, compact, onPick } = props;
+    if (!slot || hidden) {
+        return (<div style={{
+                height: "100%",
+                minHeight: compact ? 40 : DEMO_CELL_H,
+                maxHeight: compact ? 40 : DEMO_CELL_MAX_H,
+                borderRadius: compact ? 4 : 6,
+                border: `1px dashed ${P.line}`,
+                background: P.surface,
+            }}/>);
+    }
+    const count = countOf(slot, applied);
+    const band = bandOf(count);
+    const isMine = MY_SHIFTS.includes(slot.id);
+    const isOrigin = origins.includes(slot.id);
+    const isTarget = targets.includes(slot.id);
+    const gap = !hasMath(slot);
+    const plfBlocked = band === "full";
+    const canUndoLeave = isOrigin && origins.length > 1;
+    // Always allow toggling your shifts (add / remove with floor of 1)
+    // Allow join targets when not yours
+    let selectable = false;
+    if (isMine)
+        selectable = true;
+    else if (!plfBlocked || isTarget)
+        selectable = true;
+    const f = {
+        band,
+        count,
+        isMine,
+        isOrigin,
+        isTarget,
+        originIndex: isOrigin ? origins.indexOf(slot.id) + 1 : 0,
+        targetIndex: isTarget ? targets.indexOf(slot.id) + 1 : 0,
+        gap,
+        phase,
+        canUndoLeave,
+    };
+    const chrome = cellChrome(f, skin);
+    const railPad = skin === "B" || skin === "L" || skin === "F" || skin === "H";
+    return (<button type="button" onClick={() => {
+            if (selectable)
+                onPick(slot.id);
+        }} style={{
+            position: "relative",
+            width: "100%",
+            minHeight: compact ? 40 : DEMO_CELL_H,
+            maxHeight: compact ? 40 : DEMO_CELL_MAX_H,
+            boxSizing: "border-box",
+            padding: compact
+                ? railPad
+                    ? "4px 4px 4px 8px"
+                    : "4px 4px"
+                : railPad
+                    ? "5px 6px 5px 9px"
+                    : "5px 6px",
+            borderRadius: compact ? 4 : 6,
+            border: chrome.border,
+            background: chrome.bg,
+            opacity: chrome.opacity,
+            cursor: selectable ? "pointer" : "default",
+            textAlign: "left",
+        }}>
+      <CellBody f={f} skin={skin} loc={slot.loc} compact={compact} mathStyle={mathStyle}/>
+    </button>);
+}
+function SlotListRow(props) {
+    const { slot, applied, origins, targets, phase, skin, mathStyle = "blend", onPick } = props;
+    const count = countOf(slot, applied);
+    const band = bandOf(count);
+    const isMine = MY_SHIFTS.includes(slot.id);
+    const isOrigin = origins.includes(slot.id);
+    const isTarget = targets.includes(slot.id);
+    const gap = !hasMath(slot);
+    const plfBlocked = band === "full";
+    const canUndoLeave = isOrigin && origins.length > 1;
+    const selectable = isMine || !plfBlocked || isTarget;
+    const on = promoted(band);
+    const f = {
+        band,
+        count,
+        isMine,
+        isOrigin,
+        isTarget,
+        originIndex: isOrigin ? origins.indexOf(slot.id) + 1 : 0,
+        targetIndex: isTarget ? targets.indexOf(slot.id) + 1 : 0,
+        gap,
+        phase,
+        canUndoLeave,
+    };
+    const chrome = cellChrome(f, skin);
+    const mathSurf = mathSurfaceOf(f, skin);
+    const indexBg = selectAccentOf(skin) === "green" ? P.green : P.blue600;
+    let tag = "";
+    if (isOrigin)
+        tag = canUndoLeave ? "Leaving" : "Leaving · Keep";
+    else if (isMine)
+        tag = "Yours";
+    else if (isTarget)
+        tag = "Joining";
+    else if (band === "full")
+        tag = "Full";
+    else if (band === "needs")
+        tag = "Needs";
+    else if (band === "available")
+        tag = "Open";
+    else
+        tag = "Covered";
+    return (<button type="button" onClick={() => {
+            if (selectable)
+                onPick(slot.id);
+        }} style={{
+            width: "100%",
+            textAlign: "left",
+            padding: "9px 11px",
+            borderRadius: 8,
+            border: chrome.border,
+            background: chrome.bg,
+            opacity: chrome.opacity,
+            cursor: selectable ? "pointer" : "default",
+        }}>
+      <Row gap={8} align="center">
+        <Stack gap={1} style={{ flex: 1, minWidth: 0 }}>
+          <Row gap={6} align="center" wrap>
+            <Text weight="semibold" size="small">
+              {TIMES.find((t) => t.key === slot.timeKey)?.label ?? slot.timeKey}
+            </Text>
+            <Text size="small" tone="tertiary">
+              {locShort(slot.loc)}
+            </Text>
+            <Text size="small" tone="secondary" style={{ fontVariantNumeric: "tabular-nums" }}>
+              {count}/{HARD_CAP}
+            </Text>
+            {gap && on && <MathNeededBadge surface={mathSurf} style={mathStyle}/>}
+          </Row>
+          <Text size="small" tone="tertiary">
+            {tag}
+          </Text>
+        </Stack>
+        {(isOrigin || isTarget) && (<span style={{
+                width: 20,
+                height: 20,
+                borderRadius: 10,
+                background: isOrigin ? P.blue800 : indexBg,
+                color: P.white,
+                fontSize: 10,
+                fontWeight: 700,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+            }}>
+            {isOrigin ? origins.indexOf(slot.id) + 1 : targets.indexOf(slot.id) + 1}
+          </span>)}
+      </Row>
+    </button>);
+}
+/* ---------- Match strip / sidebar ---------- */
+function MatchStrip(props) {
+    const { origins, targets, phase, forAdmin, plfName, onRemoveOrigin, onRemoveTarget, onFocusLeaving, onFocusJoining, onConfirm, onBack, } = props;
+    const n = origins.length;
+    const ready = n > 0 && targets.length === n;
+    return (<div style={{ borderTop: `1px solid ${P.line}`, background: P.white, padding: "8px 12px" }}>
+      <Stack gap={6}>
+        <Row gap={8} align="center" wrap>
+          <Text size="small" weight="semibold">
+            {forAdmin ? `Assign ${plfName}` : "Move"} · {n}h
+          </Text>
+          <Spacer />
+          <Text size="small" style={{ color: ready ? P.green : P.ink600 }}>
+            {ready
+            ? "Ready"
+            : targets.length < n
+                ? `${n - targets.length} More To Join`
+                : "Adjust Selection"}
+          </Text>
+        </Row>
+
+        <Row gap={6} align="center" wrap>
+          <button type="button" onClick={onFocusLeaving} style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer" }}>
+            <Text size="small" weight="semibold" style={{ color: phase === "leaving" ? P.blue600 : P.ink600 }}>
+              Leave
+            </Text>
+          </button>
+          {origins.map((s, i) => (<span key={s.id}>
+              <FilledChip label={shortFmt(s)} kind="leave" index={i + 1} locked={origins.length <= 1} onRemove={() => onRemoveOrigin(s.id)}/>
+            </span>))}
+
+          <Text size="small" tone="tertiary">→</Text>
+
+          <button type="button" onClick={onFocusJoining} style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer" }}>
+            <Text size="small" weight="semibold" style={{ color: phase === "joining" ? P.blue600 : P.ink600 }}>
+              Join
+            </Text>
+          </button>
+          {Array.from({ length: n }, (_, i) => {
+            const s = targets[i];
+            return s ? (<span key={s.id}>
+                <FilledChip label={shortFmt(s)} kind="join" index={i + 1} onRemove={() => onRemoveTarget(s.id)}/>
+              </span>) : (<span key={`jo-${i}`}>
+                <EmptySlot label={`#${i + 1}`}/>
+              </span>);
+        })}
+
+          <Spacer />
+          <Btn onClick={onBack}>Back</Btn>
+          <Btn variant="primary" disabled={!ready} onClick={onConfirm}>
+            {forAdmin ? "Apply" : "Confirm"}
+          </Btn>
+        </Row>
+
+        {targets.map((t) => (<div key={`ppl-${t.id}`} style={{ minWidth: 0 }}>
+            <Text size="small" tone="tertiary">
+              {shortFmt(t)}
+            </Text>
+            <FacilitatorsInline people={t.people}/>
+          </div>))}
+      </Stack>
+    </div>);
+}
+function SidebarConfirm(props) {
+    const { origins, targets, phase, forAdmin, plfName, onRemoveOrigin, onRemoveTarget, onFocusLeaving, onFocusJoining, onConfirm, onBack, } = props;
+    const n = origins.length;
+    const ready = n > 0 && targets.length === n;
+    return (<div style={{
+            flex: "1 0 256px",
+            minWidth: 248,
+            maxWidth: 288,
+            borderLeft: `1px solid ${P.line}`,
+            background: P.white,
+            padding: 14,
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
+            boxSizing: "border-box",
+            alignSelf: "stretch",
+            overflowY: "auto",
+        }}>
+      <Stack gap={2}>
+        <Text weight="semibold">{forAdmin ? `Assign ${plfName}` : "Confirm Move"}</Text>
+        <Text size="small" tone="secondary">
+          {n} Hour{n === 1 ? "" : "s"} Matched
+        </Text>
+      </Stack>
+
+      <Stack gap={5}>
+        <button type="button" onClick={onFocusLeaving} style={{ border: "none", background: "transparent", padding: 0, textAlign: "left", cursor: "pointer" }}>
+          <Text size="small" weight="semibold" style={{ color: phase === "leaving" ? P.blue600 : P.ink600 }}>
+            Leave ({origins.length})
+          </Text>
+        </button>
+        <Row gap={5} wrap>
+          {origins.map((s, i) => (<span key={s.id}>
+              <FilledChip label={shortFmt(s)} kind="leave" index={i + 1} locked={origins.length <= 1} onRemove={() => onRemoveOrigin(s.id)}/>
+            </span>))}
+        </Row>
+      </Stack>
+
+      <Stack gap={5}>
+        <button type="button" onClick={onFocusJoining} style={{ border: "none", background: "transparent", padding: 0, textAlign: "left", cursor: "pointer" }}>
+          <Text size="small" weight="semibold" style={{ color: phase === "joining" ? P.blue600 : P.ink600 }}>
+            Join ({targets.length}/{n})
+          </Text>
+        </button>
+        {targets.map((t, i) => (<div key={t.id} style={{ minWidth: 0 }}>
+            <FilledChip label={shortFmt(t)} kind="join" index={i + 1} onRemove={() => onRemoveTarget(t.id)}/>
+            <div style={{ marginTop: 4 }}>
+              <FacilitatorsInline people={t.people}/>
+            </div>
+          </div>))}
+        {Array.from({ length: Math.max(0, n - targets.length) }, (_, i) => (<span key={`empty-${i}`}>
+            <EmptySlot label={`#${targets.length + i + 1}`}/>
+          </span>))}
+      </Stack>
+
+      <Spacer />
+      <Btn variant="primary" disabled={!ready} onClick={onConfirm}>
+        {forAdmin ? "Apply Override" : "Confirm Move"}
+      </Btn>
+      <Btn onClick={onBack}>{forAdmin ? "Back To Leave Hours" : "Back To Your Shifts"}</Btn>
+    </div>);
+}
+/* ---------- Choose-shifts gate ---------- */
+function ChooseShifts(props) {
+    const { role, adminPlf, rosterLabel, selected, onToggle, onContinue, applied, onUndoApplied } = props;
+    const mine = MY_SHIFTS.map((id) => slotById(id));
+    const isAdmin = role === "admin";
+    return (<Stack gap={12} style={{ padding: isAdmin ? "12px 14px" : 16, maxWidth: 520 }}>
+      <Stack gap={3}>
+        <div style={{ fontSize: 17, fontWeight: 600, color: P.ink900 }}>
+          {isAdmin ? `Leave Hours For ${adminPlf}` : "Move A Shift"}
+        </div>
+        <Text size="small" tone="secondary">
+          {isAdmin
+            ? `Week 6 · Select which of ${adminPlf}'s shifts to leave${rosterLabel ? ` · ${rosterLabel}` : ""}`
+            : "Week 6 · STEM Drop-In · Select hours you cannot make"}
+        </Text>
+      </Stack>
+
+      {applied && role === "plf" && (<div style={{
+                background: P.blue50,
+                borderRadius: 8,
+                padding: "8px 10px",
+                border: `1px solid ${P.blue200}`,
+            }}>
+          <Row gap={8} align="center" wrap>
+            <Text size="small" weight="semibold" style={{ color: P.blue800 }}>
+              Moved This Week
+            </Text>
+            <Text size="small">
+              {applied.origins.map((id) => shortFmt(slotById(id))).join(" + ")} →{" "}
+              {applied.targets.map((id) => shortFmt(slotById(id))).join(" + ")}
+            </Text>
+            <Spacer />
+            <Btn onClick={onUndoApplied}>Undo</Btn>
+          </Row>
+        </div>)}
+
+      <Stack gap={6}>
+        <Text weight="semibold">
+          {isAdmin ? `${adminPlf}'s Shifts This Week` : "Your Shifts This Week"}
         </Text>
         <Text size="small" tone="secondary">
-          →
+          {isAdmin
+            ? "Pick the hours this PLF will leave. Keep at least one selected, then continue."
+            : "Select the hours you cannot make. Keep at least one selected, then continue."}
         </Text>
-        <Text size="small" weight="semibold" style={{ color: joinColor }}>
-          Join
-        </Text>
-      </Row>
-    );
-  }
-  if (row.kind === "addon") {
-    return (
-      <Text size="small" weight="semibold" style={{ color: joinColor }}>
-        Add-on
-      </Text>
-    );
-  }
-  return (
-    <Text size="small" weight="semibold" style={{ color: leaveColor }}>
-      Leave
-    </Text>
-  );
+
+        <Stack gap={6}>
+          {mine.map((s) => {
+            const on = selected.includes(s.id);
+            return (<button key={s.id} type="button" onClick={() => onToggle(s.id)} style={{
+                    textAlign: "left",
+                    padding: "10px 12px",
+                    borderRadius: 8,
+                    border: on ? `1.5px solid ${P.blue600}` : `1px solid ${P.line}`,
+                    background: on ? P.blue50 : P.white,
+                    cursor: "pointer",
+                }}>
+                <Row gap={10} align="center">
+                  <span style={{
+                    width: 18,
+                    height: 18,
+                    borderRadius: 4,
+                    border: `1.5px solid ${on ? P.blue600 : P.line}`,
+                    background: on ? P.blue600 : P.white,
+                    color: P.white,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                }}>
+                    {on ? "✓" : ""}
+                  </span>
+                  <Stack gap={2}>
+                    <Text size="small" weight="semibold">
+                      {shortFmt(s)}
+                    </Text>
+                    <Text size="small" tone="tertiary">
+                      {LOC[s.loc]}
+                    </Text>
+                  </Stack>
+                </Row>
+              </button>);
+        })}
+        </Stack>
+
+        <Row gap={8} align="center">
+          <Text size="small" tone="tertiary">
+            {selected.length} Selected
+          </Text>
+          <Spacer />
+          <Btn variant="primary" disabled={selected.length === 0} onClick={onContinue}>
+            {isAdmin ? "Continue To Assign" : "Continue To Timetable"}
+          </Btn>
+        </Row>
+      </Stack>
+    </Stack>);
 }
-
-function timeChipLabel(t) {
-  if (t.key === "10") return "10–12";
-  if (t.key === "12") return "12–14";
-  if (t.key === "14") return "14–16";
-  return "16–18";
-}
-
-function AbsenceReallocationPoc() {
-  const [screen, setScreen] = useState("plf");
-  const [selected, setSelected] = useState(null);
-  const [confirmed, setConfirmed] = useState(false);
-  const [dayFilter, setDayFilter] = useState("All");
-  const [timeFilter, setTimeFilter] = useState("All");
-  const [needsOnly, setNeedsOnly] = useState(false);
-  const [needsMathOnly, setNeedsMathOnly] = useState(false);
-  const [leaveOriginal, setLeaveOriginal] = useState(true);
-  const [ackOverCap, setAckOverCap] = useState(false);
-
-  const week = "Week of 4 Aug 2026";
-  const currentShift = {
-    day: "Mon",
-    timeKey: "14",
-    time: "14:00–16:00",
-    location: "GP Library L3",
-    roster: "STEM Drop-in S2 2026",
-  };
-
-  const selectedSlot = SLOTS.find((s) => s.id === selected) ?? null;
-  const selectedCount = selectedSlot?.facilitators.length ?? 0;
-  const overCapWarning = !!selectedSlot && selectedCount >= HARD_CAP;
-
-  const needsCount = SLOTS.filter(
-    (s) => bandFromCount(s.facilitators.length, s.max) === "needs"
-  ).length;
-
-  const shortcuts = SLOTS.filter(
-    (s) => bandFromCount(s.facilitators.length, s.max) === "needs"
-  )
-    .sort((a, b) => shortcutRank(a) - shortcutRank(b))
-    .slice(0, 3);
-
-  function pickSlot(slot) {
-    setSelected(slot.id);
-    setConfirmed(false);
-    setAckOverCap(false);
-  }
-
-  function cellDimmed(slot) {
-    if (!slot) return false;
-    const level = bandFromCount(slot.facilitators.length, slot.max);
-    if (needsOnly && level !== "needs") return true;
-    if (
-      needsMathOnly &&
-      disciplineFit(slot) !== "missing" &&
-      disciplineFit(slot) !== "low"
-    ) {
-      return true;
+/* ---------- Timetable picker ---------- */
+function TimetablePicker(props) {
+    const { role, narrow, confirmLayout, skin, mathStyle = "blend", adminPlf, rosterLabel, rosterCode, onApplied } = props;
+    const prefix = role === "admin" ? "p6a" : "p6";
+    const [stage, setStage] = useCanvasState(`${prefix}_stage`, "choose");
+    const [origins, setOrigins] = useCanvasState(`${prefix}_origins`, []);
+    const [targets, setTargets] = useCanvasState(`${prefix}_targets`, []);
+    const [phase, setPhase] = useCanvasState(`${prefix}_phase`, "joining");
+    const [applied, setApplied] = useCanvasState(`${prefix}_applied`, null);
+    const [fNeeds, setFNeeds] = useCanvasState(`${prefix}_fneeds`, false);
+    const [fMath, setFMath] = useCanvasState(`${prefix}_fmath`, false);
+    const [hint, setHint] = useCanvasState(`${prefix}_hint`, null);
+    const [viewPref, setViewPref] = useCanvasState(`${prefix}_view2`, "week");
+    const [dayFilter, setDayFilter] = useCanvasState(`${prefix}_day`, "All");
+    const [query, setQuery] = useCanvasState(`${prefix}_q`, "");
+    // Mobile: list only. Desktop: week by default, list optional.
+    const view = narrow ? "list" : viewPref;
+    const originSlots = origins.map((id) => slotById(id)).filter((s) => !!s);
+    const targetSlots = targets.map((id) => slotById(id)).filter((s) => !!s);
+    function trimJoins(nextOrigins) {
+        if (targets.length > nextOrigins.length) {
+            setTargets(targets.slice(0, nextOrigins.length));
+        }
     }
-    return false;
-  }
+    function removeOrigin(id) {
+        if (origins.length <= 1) {
+            setHint("Keep At Least One Shift Selected To Leave");
+            return;
+        }
+        const next = origins.filter((x) => x !== id);
+        setOrigins(next);
+        trimJoins(next);
+        setHint(null);
+        setPhase("leaving");
+    }
+    function addOrigin(id) {
+        if (!MY_SHIFTS.includes(id))
+            return;
+        if (origins.includes(id))
+            return;
+        const next = [...origins, id];
+        setOrigins(next);
+        setHint(null);
+    }
+    function removeTarget(id) {
+        setTargets(targets.filter((x) => x !== id));
+        setPhase("joining");
+    }
+    function pick(id) {
+        // Your shifts: toggle leave (floor of 1)
+        if (MY_SHIFTS.includes(id)) {
+            if (origins.includes(id)) {
+                removeOrigin(id);
+            }
+            else {
+                addOrigin(id);
+                // After adding a leave, need another join: clear excess? joins stay, need more
+                setPhase("joining");
+            }
+            return;
+        }
+        // Join targets
+        if (origins.includes(id))
+            return;
+        if (targets.includes(id)) {
+            removeTarget(id);
+            return;
+        }
+        if (targets.length >= origins.length) {
+            // Replace last join rather than exceed leave count
+            setTargets([...targets.slice(0, origins.length - 1), id]);
+            setPhase("joining");
+            return;
+        }
+        setTargets([...targets, id]);
+        setPhase("joining");
+        setHint(null);
+    }
+    function confirm() {
+        if (origins.length === 0 || targets.length !== origins.length)
+            return;
+        setApplied({ origins: [...origins], targets: [...targets] });
+        const from = originSlots.map(overrideFmt).join(" + ");
+        const to = targetSlots.map(overrideFmt).join(" + ");
+        onApplied?.({
+            message: role === "admin"
+                ? `Override Applied For ${adminPlf}`
+                : `Moved ${originSlots.map(shortFmt).join(" + ")} → ${targetSlots.map(shortFmt).join(" + ")}`,
+            from,
+            to,
+            hours: origins.length,
+        });
+        setOrigins([]);
+        setTargets([]);
+        setStage("choose");
+        setPhase("joining");
+    }
+    function backToChoose() {
+        setStage("choose");
+        setTargets([]);
+        setPhase("joining");
+        setHint(null);
+    }
+    function filteredOut(s) {
+        if (fNeeds && !promoted(bandOf(countOf(s, applied))))
+            return true;
+        if (fMath && hasMath(s))
+            return true;
+        if (dayFilter !== "All" && s.day !== dayFilter)
+            return true;
+        if (query.trim()) {
+            const q = query.trim().toLowerCase();
+            const hay = `${s.day} ${s.start} ${LOC[s.loc]} ${locShort(s.loc)}`.toLowerCase();
+            if (!hay.includes(q))
+                return true;
+        }
+        return false;
+    }
+    const needsCount = SLOTS.filter((s) => bandOf(countOf(s, applied)) === "needs").length;
+    const useSidebar = confirmLayout === "sidebar" && !narrow && stage === "move";
+    const showTray = (confirmLayout === "tray" || narrow) && stage === "move";
+    const listSlots = SLOTS.filter((s) => !filteredOut(s))
+        .slice()
+        .sort((a, b) => {
+        const di = DAYS.indexOf(a.day) -
+            DAYS.indexOf(b.day);
+        if (di !== 0)
+            return di;
+        return (TIMES.findIndex((t) => t.key === a.timeKey) - TIMES.findIndex((t) => t.key === b.timeKey));
+    });
+    if (stage === "choose") {
+        return (<ChooseShifts role={role} adminPlf={adminPlf} rosterLabel={rosterLabel} rosterCode={rosterCode} selected={origins} onToggle={(id) => {
+                // On the choose screen, allow clearing to re-pick; Continue stays disabled at 0.
+                if (origins.includes(id)) {
+                    setOrigins(origins.filter((x) => x !== id));
+                }
+                else {
+                    setOrigins([...origins, id]);
+                }
+                setHint(null);
+            }} onContinue={() => {
+                if (origins.length === 0)
+                    return;
+                setTargets([]);
+                setPhase("joining");
+                setStage("move");
+                setHint(null);
+            }} applied={applied} onUndoApplied={() => {
+                setApplied(null);
+                onApplied?.({ message: "Move Undone", from: "", to: "", hours: 0 });
+            }}/>);
+    }
+    const stripProps = {
+        origins: originSlots,
+        targets: targetSlots,
+        phase,
+        forAdmin: role === "admin",
+        plfName: adminPlf,
+        onRemoveOrigin: removeOrigin,
+        onRemoveTarget: removeTarget,
+        onFocusLeaving: () => setPhase("leaving"),
+        onFocusJoining: () => setPhase("joining"),
+        onConfirm: confirm,
+        onBack: backToChoose,
+    };
+    const grid = (<Stack gap={8} style={{ padding: narrow ? 10 : 12, flex: 1, minWidth: 0 }}>
+      <Stack gap={2}>
+        <div style={{ fontSize: 16, fontWeight: 600, color: P.ink900 }}>
+          {role === "admin" ? `Join Hours For ${adminPlf}` : "Move A Shift"}
+        </div>
+        <Text size="small" tone="secondary">
+          {role === "admin"
+            ? `Leave ${origins.length} · Join ${origins.length} for ${adminPlf}${rosterLabel ? ` · ${rosterLabel}` : ""}`
+            : `Leave ${origins.length} · Join ${origins.length} · Undo leave with × (keep ≥1)`}
+        </Text>
+      </Stack>
 
-  const headerBg = "#e4eaf0";
-  const timeColBg = "#eceff2";
-  const gridLine = theme.stroke.secondary;
+      {hint && (<div style={{
+                background: P.warnFill,
+                borderRadius: 6,
+                padding: "8px 10px",
+                fontSize: 12,
+                color: P.warn,
+                fontWeight: 600,
+            }}>
+          {hint}
+        </div>)}
 
-  const nav = [
-    { id: "plf", label: "PLF timetable" },
-    { id: "ssp", label: "Admin confirmation" },
-  ];
+      {!narrow && (<Row gap={4}>
+          <Chip label="Week Grid" active={view === "week"} onClick={() => setViewPref("week")}/>
+          <Chip label="Browse List" active={view === "list"} onClick={() => setViewPref("list")}/>
+        </Row>)}
 
-  return (
-    <Stack gap={14} style={{ maxWidth: 1000, margin: "0 auto", padding: 16 }}>
-      <H1>Absence Reallocation</H1>
+      {view === "week" && (<Stack gap={6}>
+          <Row gap={6} wrap>
+            <Chip label={`Open Slots (${needsCount})`} active={fNeeds} onClick={() => setFNeeds(!fNeeds)}/>
+            <Chip label="⚠ Needs MATH" active={fMath} onClick={() => setFMath(!fMath)}/>
+          </Row>
+          <div style={{
+                border: `1px solid ${P.line}`,
+                borderRadius: 8,
+                padding: 8,
+                background: P.white,
+                overflowX: "auto",
+            }}>
+            <div style={{
+                width: "100%",
+                minWidth: 520,
+                maxWidth: DEMO_GRID_MAX_W,
+                margin: "0 auto",
+            }}>
+              <div style={{ display: "flex", gap: 5, marginBottom: 4 }}>
+                <div style={{ width: 44, flexShrink: 0 }}/>
+                {DAYS.map((d) => (<div key={d} style={{
+                    flex: "1 1 0",
+                    minWidth: 88,
+                    textAlign: "center",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: P.ink600,
+                    padding: "4px 0",
+                }}>
+                    {d}
+                  </div>))}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                {TIMES.map((t) => (<div key={t.key} style={{
+                    display: "flex",
+                    gap: 5,
+                    alignItems: "stretch",
+                }}>
+                    <div style={{
+                    width: 44,
+                    fontSize: 10,
+                    color: P.ink400,
+                    paddingTop: 8,
+                    flexShrink: 0,
+                }}>
+                      {t.label}
+                    </div>
+                    {DAYS.map((d) => {
+                    const s = SLOTS.find((x) => x.day === d && x.timeKey === t.key);
+                    return (<div key={d} style={{ flex: "1 1 0", minWidth: 88 }}>
+                          <GridCell slot={s} applied={applied} origins={origins} targets={targets} phase={phase} skin={skin} mathStyle={mathStyle} hidden={!!s && filteredOut(s)} onPick={pick}/>
+                        </div>);
+                })}
+                  </div>))}
+              </div>
+            </div>
+          </div>
+        </Stack>)}
 
-      <Row gap={8} wrap>
-        {nav.map((item) => (
-          <span key={item.id}>
-            <Pill active={screen === item.id} onClick={() => setScreen(item.id)}>
-              {item.label}
-            </Pill>
-          </span>
-        ))}
-      </Row>
+      {view === "list" && (<Stack gap={8}>
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search day, time, or location..." style={{
+                width: "100%",
+                boxSizing: "border-box",
+                fontSize: 13,
+                padding: "9px 11px",
+                borderRadius: 8,
+                border: `1px solid ${P.line}`,
+                background: P.white,
+                color: P.ink900,
+            }}/>
+          <Row gap={4} wrap>
+            {["All", ...DAYS].map((d) => (<span key={d}>
+                <Chip label={d} active={dayFilter === d} onClick={() => setDayFilter(d)}/>
+              </span>))}
+          </Row>
+          <Row gap={4} wrap>
+            <Chip label={`Open Slots (${needsCount})`} active={fNeeds} onClick={() => setFNeeds(!fNeeds)}/>
+            <Chip label="⚠ Needs MATH" active={fMath} onClick={() => setFMath(!fMath)}/>
+          </Row>
+          <Text size="small" tone="tertiary">
+            {listSlots.length} Slot{listSlots.length === 1 ? "" : "s"}
+          </Text>
+          <Stack gap={8}>
+            {(dayFilter === "All" ? [...DAYS] : [dayFilter]).map((day) => {
+                const daySlots = listSlots.filter((s) => s.day === day);
+                if (daySlots.length === 0)
+                    return null;
+                return (<div key={day}>
+                  <Stack gap={5}>
+                    <Text size="small" weight="semibold" style={{ color: P.ink600 }}>
+                      {day}
+                    </Text>
+                    {daySlots.map((s) => (<div key={s.id}>
+                        <SlotListRow slot={s} applied={applied} origins={origins} targets={targets} phase={phase} skin={skin} mathStyle={mathStyle} onPick={pick}/>
+                      </div>))}
+                  </Stack>
+                </div>);
+            })}
+            {listSlots.length === 0 && (<Text size="small" tone="tertiary">
+                No Slots Match These Filters
+              </Text>)}
+          </Stack>
+        </Stack>)}
+
+    </Stack>);
+    if (useSidebar) {
+        return (<div style={{ display: "flex", alignItems: "stretch", width: "100%" }}>
+        <div style={{ flex: 1, minWidth: 0 }}>{grid}</div>
+        <SidebarConfirm {...stripProps}/>
+      </div>);
+    }
+    return (<div style={{ display: "flex", flexDirection: "column", width: "100%" }}>
+      <div>{grid}</div>
+      {showTray && (<div style={{ position: "sticky", bottom: 0, zIndex: 5 }}>
+          <MatchStrip {...stripProps}/>
+        </div>)}
+    </div>);
+}
+/* ---------- Galleries ---------- */
+function TestDesigns(props) {
+    const { skin, mathStyle, onSkin, onMath } = props;
+    const samples = [
+        { label: "Needs", count: 2, kind: "needs" },
+        { label: "Available", count: 5, kind: "available" },
+        { label: "Covered", count: 8, kind: "covered" },
+        { label: "Full", count: 10, kind: "full" },
+        { label: "Your Shift", count: 6, kind: "yours" },
+        { label: "Leaving", count: 6, kind: "leaving" },
+        { label: "Joining", count: 3, kind: "selected" },
+    ];
+    return (<Stack gap={16} style={{ padding: 16 }}>
+      <Stack gap={4}>
+        <div style={{ fontSize: 18, fontWeight: 600, color: P.ink900 }}>Design Lab</div>
+        <Text size="small" tone="secondary">
+          Side-by-side cell states for the selected theme. Pick a skin or MATH badge below — the same
+          choice drives the live Move / Assign timetable when you leave this lab.
+        </Text>
+      </Stack>
+
+      {SKIN_GROUPS.map((group) => (<div key={group.title}>
+          <Stack gap={6}>
+            <Text size="small" weight="semibold">
+              {group.title}
+            </Text>
+            <Row gap={8} wrap>
+              {group.skins.map((s) => (<span key={s}>
+                  <Chip label={SKIN_META[s].badge} active={skin === s} onClick={() => onSkin(s)}/>
+                </span>))}
+            </Row>
+          </Stack>
+        </div>))}
+
+      <Callout tone="neutral" title={SKIN_META[skin].badge}>
+        {SKIN_META[skin].pitch}
+      </Callout>
+
+      <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
+            gap: 10,
+        }}>
+        {samples.map((sample) => {
+            const band = sample.kind === "yours" || sample.kind === "leaving" || sample.kind === "selected"
+                ? "needs"
+                : sample.kind;
+            const f = {
+                band,
+                count: sample.count,
+                isMine: sample.kind === "yours",
+                isOrigin: sample.kind === "leaving",
+                isTarget: sample.kind === "selected",
+                originIndex: sample.kind === "leaving" ? 1 : 0,
+                targetIndex: sample.kind === "selected" ? 1 : 0,
+                gap: sample.kind === "needs" || sample.kind === "available",
+                phase: "joining",
+                canUndoLeave: sample.kind === "leaving",
+            };
+            const chrome = cellChrome(f, skin);
+            const railPad = skin === "B" || skin === "L" || skin === "F" || skin === "H";
+            return (<div key={sample.label}>
+              <Text size="small" tone="tertiary">
+                {sample.label}
+              </Text>
+              <div style={{
+                    position: "relative",
+                    marginTop: 4,
+                    minHeight: 64,
+                    padding: railPad ? "8px 8px 8px 12px" : 8,
+                    borderRadius: 6,
+                    border: chrome.border,
+                    background: chrome.bg,
+                    opacity: chrome.opacity,
+                }}>
+                <CellBody f={f} skin={skin} loc="gp" mathStyle={mathStyle}/>
+              </div>
+            </div>);
+        })}
+      </div>
 
       <Divider />
 
-      {screen === "plf" && (
-        <Stack gap={12}>
-          <Row gap={10} align="center" wrap>
-            <H2 style={{ margin: 0 }}>PLF timetable</H2>
-            <Pill size="sm" active>
-              User side
-            </Pill>
-            <Spacer />
-            <Text tone="secondary" size="small">
-              {week}
-            </Text>
-          </Row>
-          <Text tone="secondary" size="small">
-            Facilitator view — pick an open slot on the week grid to swap your current shift.
+      <Stack gap={6}>
+        <Text size="small" weight="semibold">
+          MATH badge styles
+        </Text>
+        <Text size="small" tone="tertiary">
+          Independent of cell skin. Try each on a green or blue open cell above.
+        </Text>
+        <Row gap={8} wrap>
+          {ALL_MATH.map((m) => (<span key={m}>
+              <Chip label={MATH_META[m].badge} active={mathStyle === m} onClick={() => onMath(m)}/>
+            </span>))}
+        </Row>
+        <Callout tone="neutral" title={MATH_META[mathStyle].badge}>
+          {MATH_META[mathStyle].pitch}
+        </Callout>
+        <Row gap={10} wrap>
+          {["green", "blue", "neutral"].map((surf) => (<div key={surf} style={{
+                padding: 10,
+                borderRadius: 8,
+                background: surf === "green" ? P.greenFill : surf === "blue" ? P.blue50 : P.surface,
+                border: `1px solid ${P.line}`,
+            }}>
+              <MathNeededBadge surface={surf} style={mathStyle}/>
+            </div>))}
+        </Row>
+      </Stack>
+    </Stack>);
+}
+function ConfirmCompare() {
+    const [layout, setLayout] = useCanvasState("p6_cmp", "sidebar");
+    const origins = [slotById("mon-14"), slotById("mon-15")];
+    const targets = [slotById("wed-12"), slotById("wed-13")];
+    const noop = () => undefined;
+    const shared = {
+        origins,
+        targets,
+        phase: "joining",
+        onRemoveOrigin: noop,
+        onRemoveTarget: noop,
+        onFocusLeaving: noop,
+        onFocusJoining: noop,
+        onConfirm: noop,
+        onBack: noop,
+    };
+    return (<Stack gap={14} style={{ padding: 16 }}>
+      <Stack gap={4}>
+        <div style={{ fontSize: 18, fontWeight: 600, color: P.ink900 }}>Confirm Layout Lab</div>
+        <Text size="small" tone="secondary">
+          Compare sticky bottom tray vs right sidebar. Both stay available for supervisor feedback.
+        </Text>
+      </Stack>
+      <Row gap={8}>
+        <Chip label="Sticky Tray" active={layout === "tray"} onClick={() => setLayout("tray")}/>
+        <Chip label="Right Sidebar" active={layout === "sidebar"} onClick={() => setLayout("sidebar")}/>
+      </Row>
+      {layout === "tray" ? (<div style={{ border: `1px solid ${P.line}`, borderRadius: 8, overflow: "hidden" }}>
+          <div style={{
+                height: 140,
+                background: P.surface,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+            }}>
+            <Text size="small" tone="tertiary">Timetable Area</Text>
+          </div>
+          <MatchStrip {...shared}/>
+        </div>) : (<div style={{
+                display: "flex",
+                border: `1px solid ${P.line}`,
+                borderRadius: 8,
+                overflow: "hidden",
+                minHeight: 340,
+            }}>
+          <div style={{
+                flex: 1,
+                background: P.surface,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+            }}>
+            <Text size="small" tone="tertiary">Week Grid</Text>
+          </div>
+          <SidebarConfirm {...shared}/>
+        </div>)}
+    </Stack>);
+}
+function ActiveOverrides(props) {
+    const [rows, setRows] = useCanvasState("p6_rows", SEED_OVERRIDES);
+    const active = rows.filter((r) => r.status === "active");
+    return (<Stack gap={14} style={{ padding: 16 }}>
+      <Row gap={10} align="center" wrap>
+        <Stack gap={3} style={{ flex: 1 }}>
+          <div style={{ fontSize: 18, fontWeight: 600, color: P.ink900 }}>Active Overrides</div>
+          <Text size="small" tone="secondary">
+            Week 6 · {active.length} Active · Leave hours must match join hours
           </Text>
+        </Stack>
+        <Btn variant="primary" onClick={props.onAssign}>
+          Assign Override
+        </Btn>
+      </Row>
 
-          <Card>
-            <CardBody>
-              <Row gap={10} align="center" wrap>
-                <Text size="small" weight="semibold">
-                  Your shift
-                </Text>
-                <Text size="small">
-                  {currentShift.day} {currentShift.time}
-                </Text>
-                <Text size="small" tone="secondary">
-                  {currentShift.location}
-                </Text>
-                {ME.badges.map((b) => (
-                  <span key={b}>
-                    <Pill size="sm" active={b === ME.primaryBadge}>
-                      {DISCIPLINE_ICON[b] ?? "·"} {b}
-                    </Pill>
-                  </span>
-                ))}
-                <Spacer />
-                <Text size="small" tone="tertiary">
-                  Leaves on swap
-                </Text>
-              </Row>
-            </CardBody>
-          </Card>
-
-          {needsCount > 0 && (
-            <Callout tone="success" title={`${needsCount} slots need people`}>
-              Prefer green cells when you can. ★ = Needs {ME.primaryBadge}.
-            </Callout>
-          )}
-
-          <Stack
-            gap={10}
-            style={{
-              padding: 14,
-              borderRadius: 10,
-              border: `1px solid ${theme.stroke.secondary}`,
-              background: theme.bg.elevated,
-            }}
-          >
-            <Row gap={8} align="center" wrap>
-              <Text size="small" weight="semibold">
-                Day
-              </Text>
-              {["All", ...DAYS].map((d) => (
-                <span key={d}>
-                  <FilterChip
-                    large
-                    label={d}
-                    active={dayFilter === d}
-                    onClick={() => setDayFilter(d)}
-                  />
-                </span>
-              ))}
-              <Text size="small" weight="semibold" style={{ marginLeft: 6 }}>
-                Time
-              </Text>
-              <FilterChip
-                large
-                label="All"
-                active={timeFilter === "All"}
-                onClick={() => setTimeFilter("All")}
-              />
-              {TIMES.map((t) => (
-                <span key={t.key}>
-                  <FilterChip
-                    large
-                    label={timeChipLabel(t)}
-                    active={timeFilter === t.key}
-                    onClick={() => setTimeFilter(t.key)}
-                  />
-                </span>
-              ))}
-              <FilterChip
-                large
-                label="Needs people"
-                active={needsOnly}
-                onClick={() => setNeedsOnly(!needsOnly)}
-              />
-              <FilterChip
-                large
-                label={`Needs ${ME.primaryBadge}`}
-                active={needsMathOnly}
-                onClick={() => setNeedsMathOnly(!needsMathOnly)}
-              />
-            </Row>
-
-            <Row gap={8} align="center" wrap>
-              <Text size="small" weight="semibold">
-                Suggested
-              </Text>
-              {shortcuts.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => pickSlot(s)}
-                  style={{
-                    padding: "8px 12px",
-                    borderRadius: 8,
-                    border: `1px solid ${theme.stroke.secondary}`,
-                    background: theme.bg.chrome,
-                    cursor: "pointer",
-                  }}
-                >
-                  <Row gap={6} align="center">
-                    <Text size="small" weight="semibold">
-                      {s.day} {s.time.split("–")[0]}
-                    </Text>
-                    <Text size="small" tone="secondary">
-                      {s.facilitators.length}/{s.max}
-                    </Text>
-                    {(disciplineFit(s) === "missing" ||
-                      disciplineFit(s) === "low") && (
-                      <DisciplineFitIcon color={theme.accent.primary} />
-                    )}
-                  </Row>
-                </button>
-              ))}
-            </Row>
+      {active.length === 0 ? (<div style={{
+                border: `1px dashed ${P.line}`,
+                borderRadius: 8,
+                padding: 20,
+                background: P.surface,
+                textAlign: "center",
+            }}>
+          <Stack gap={8}>
+            <Text weight="semibold">No Active Overrides</Text>
+            <Text size="small" tone="secondary">
+              Assign an override for a PLF when they cannot move their own shift.
+            </Text>
+            <div>
+              <Btn variant="primary" onClick={props.onAssign}>
+                Assign Override
+              </Btn>
+            </div>
           </Stack>
-
-          <div
-            style={{
-              borderRadius: 10,
-              border: `1px solid ${gridLine}`,
-              overflow: "hidden",
-            }}
-          >
-            <Row
-              gap={0}
-              style={{ background: headerBg, borderBottom: `1px solid ${gridLine}` }}
-            >
-              <div
-                style={{
-                  width: 56,
-                  padding: "10px 8px",
-                  background: timeColBg,
-                  borderRight: `1px solid ${gridLine}`,
-                }}
-              >
-                <Text size="small" weight="semibold">
-                  Time
-                </Text>
-              </div>
-              {DAYS.map((d) => (
-                <div
-                  key={d}
-                  style={{
-                    flex: 1,
-                    padding: "10px 6px",
-                    textAlign: "center",
-                    borderRight: `1px solid ${gridLine}`,
-                  }}
-                >
+        </div>) : (<div style={{ border: `1px solid ${P.line}`, borderRadius: 8, overflow: "hidden" }}>
+          {active.map((r) => (<div key={r.id} style={{ padding: "12px 14px", borderBottom: `1px solid ${P.line}` }}>
+              <Row gap={10} align="center" wrap>
+                <Stack gap={2} style={{ minWidth: 110, flex: "0 1 140px" }}>
                   <Text size="small" weight="semibold">
-                    {d}
+                    {r.plf}
                   </Text>
-                </div>
-              ))}
-            </Row>
-            {TIMES.map((t) => {
-              if (timeFilter !== "All" && timeFilter !== t.key) return null;
-              return (
-                <div key={t.key} style={{ borderBottom: `1px solid ${gridLine}` }}>
-                  <Row gap={0} align="stretch">
-                    <div
-                      style={{
-                        width: 56,
-                        padding: "12px 8px",
-                        background: timeColBg,
-                        borderRight: `1px solid ${gridLine}`,
-                      }}
-                    >
-                      <Text size="small" tone="secondary">
-                        {t.label}
-                      </Text>
-                    </div>
-                    {DAYS.map((d) => {
-                      if (dayFilter !== "All" && dayFilter !== d) {
-                        return (
-                          <div
-                            key={d}
-                            style={{
-                              flex: 1,
-                              borderRight: `1px solid ${gridLine}`,
-                              minHeight: 76,
-                            }}
-                          />
-                        );
-                      }
-                      const slot = slotAt(d, t.key);
-                      const isCurrent =
-                        !!slot &&
-                        slot.day === currentShift.day &&
-                        slot.timeKey === currentShift.timeKey;
-                      return (
-                        <div
-                          key={d}
-                          style={{
-                            flex: 1,
-                            padding: 6,
-                            borderRight: `1px solid ${gridLine}`,
-                            display: "flex",
-                          }}
-                        >
-                          <GridCell
-                            slot={slot}
-                            selected={!!slot && selected === slot.id}
-                            dimmed={cellDimmed(slot)}
-                            isCurrent={isCurrent}
-                            onPick={pickSlot}
-                          />
-                        </div>
-                      );
-                    })}
-                  </Row>
-                </div>
-              );
+                  <Text size="small" tone="tertiary">
+                    {r.by === "Self" ? "Self move" : "Assigned by SSP"} · {r.hours}h
+                  </Text>
+                </Stack>
+                <Stack gap={2} style={{ flex: "1 1 220px", minWidth: 180 }}>
+                  <Text size="small">
+                    <span style={{ color: "#C42A1E", fontWeight: 600 }}>Leave</span>
+                    <span style={{ color: P.ink400 }}> · </span>
+                    <span style={{ color: P.ink900 }}>{r.from}</span>
+                  </Text>
+                  <Text size="small">
+                    <span style={{ color: P.green, fontWeight: 600 }}>Join</span>
+                    <span style={{ color: P.ink400 }}> · </span>
+                    <span style={{ color: P.ink900 }}>{r.to}</span>
+                  </Text>
+                </Stack>
+                <span style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: P.green,
+                    background: P.greenFill,
+                    border: `1px solid ${P.greenBorder}`,
+                    borderRadius: 999,
+                    padding: "2px 8px",
+                    flexShrink: 0,
+                }}>
+                  Active
+                </span>
+                <Spacer />
+                <Btn variant="danger" onClick={() => setRows(rows.map((x) => (x.id === r.id ? { ...x, status: "cancelled" } : x)))}>
+                  Cancel
+                </Btn>
+              </Row>
+            </div>))}
+        </div>)}
+
+      <Text size="small" tone="tertiary">
+        Cancel removes the override instantly. Assign Override opens the PLF picker + matched
+        leave/join flow on the primary MATH roster.
+      </Text>
+    </Stack>);
+}
+function AdminAssign(props) {
+    const [plf, setPlf] = useCanvasState("p6a_plf", PLF_OPTIONS[0]);
+    const [plfSearch, setPlfSearch] = useCanvasState("p6a_plf_q", PLF_OPTIONS[0]);
+    const [toast, setToast] = useCanvasState("p6a_toast", null);
+    const [, setRows] = useCanvasState("p6_rows", SEED_OVERRIDES);
+    const roster = PRIMARY_ROSTER;
+    const matches = PLF_OPTIONS.filter((p) => p.toLowerCase().includes(plfSearch.trim().toLowerCase()));
+    function pickPlf(name) {
+        setPlf(name);
+        setPlfSearch(name);
+    }
+    return (<Stack gap={0} style={{ flex: 1, minHeight: 0, height: "100%" }}>
+      <div style={{
+            padding: "6px 10px",
+            borderBottom: `1px solid ${P.line}`,
+            background: P.surface,
+            flexShrink: 0,
+        }}>
+        <Row gap={8} align="center" wrap>
+          <button type="button" onClick={props.onDone} style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 4,
+            fontSize: 12,
+            fontWeight: 600,
+            color: P.blue600,
+            background: P.white,
+            border: `1px solid ${P.blue200}`,
+            borderRadius: 6,
+            padding: "5px 10px",
+            cursor: "pointer",
+            flexShrink: 0,
+        }}>
+            ← Active
+          </button>
+          <div style={{ position: "relative", flex: "1 1 180px", minWidth: 140, maxWidth: 260 }}>
+            <input value={plfSearch} onChange={(e) => {
+            setPlfSearch(e.target.value);
+            const hit = PLF_OPTIONS.find((p) => p.toLowerCase() === e.target.value.trim().toLowerCase());
+            if (hit)
+                setPlf(hit);
+        }} placeholder="Search PLF…" style={{
+            width: "100%",
+            boxSizing: "border-box",
+            fontSize: 12,
+            fontWeight: 600,
+            padding: "5px 8px",
+            borderRadius: 6,
+            border: `1px solid ${P.line}`,
+            background: P.white,
+            color: P.ink900,
+        }}/>
+            {plfSearch.trim() &&
+            matches.length > 0 &&
+            !(matches.length === 1 && matches[0] === plf) && (<div style={{
+                position: "absolute",
+                top: "100%",
+                left: 0,
+                right: 0,
+                zIndex: 8,
+                marginTop: 2,
+                background: P.white,
+                border: `1px solid ${P.line}`,
+                borderRadius: 6,
+                boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+                maxHeight: 140,
+                overflowY: "auto",
+            }}>
+                  {matches.map((p) => (<button key={p} type="button" onClick={() => pickPlf(p)} style={{
+                    display: "block",
+                    width: "100%",
+                    textAlign: "left",
+                    padding: "6px 8px",
+                    border: "none",
+                    background: p === plf ? P.blue50 : P.white,
+                    fontSize: 12,
+                    color: P.ink900,
+                    cursor: "pointer",
+                }}>
+                      {p}
+                    </button>))}
+                </div>)}
+          </div>
+          <span title="Primary discipline roster (read-only)" style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 5,
+            background: P.blue50,
+            border: `1px solid ${P.blue200}`,
+            borderRadius: 6,
+            padding: "4px 8px",
+            fontSize: 12,
+            fontWeight: 600,
+            color: P.blue800,
+            flexShrink: 0,
+        }}>
+            <DiscIcon code={roster.code} size={12}/>
+            {roster.code} roster
+          </span>
+        </Row>
+      </div>
+      <TimetablePicker role="admin" narrow={props.narrow} confirmLayout={props.confirmLayout} skin={props.skin} mathStyle={props.mathStyle} adminPlf={plf} rosterLabel={roster.label} rosterCode={roster.code} onApplied={(info) => {
+            setToast(info.message);
+            if (info.hours > 0) {
+                setRows((prev) => [
+                    {
+                        id: Date.now(),
+                        plf,
+                        from: info.from,
+                        to: info.to,
+                        by: "SSP",
+                        hours: info.hours,
+                        status: "active",
+                    },
+                    ...prev,
+                ]);
+            }
+        }}/>
+      {toast && (<div style={{ padding: 10 }}>
+          <Row gap={8}>
+            <Text size="small">{toast}</Text>
+            <Spacer />
+            <Btn onClick={props.onDone}>View Active</Btn>
+          </Row>
+        </div>)}
+    </Stack>);
+}
+/* ---------- Shell ---------- */
+function AbsenceReallocationPhase1Prototype() {
+    const theme = hostTheme;
+    const [role, setRole] = useCanvasState("p6_role", "plf");
+    const [narrow, setNarrow] = useCanvasState("p6_narrow", false);
+    const [screen, setScreen] = useCanvasState("p6_screen2", "move");
+    const [confirmLayout, setConfirmLayout] = useCanvasState("p6_clayout", "sidebar");
+    const [skin, setSkin] = useCanvasState("p6_skin4", "C");
+    const [mathStyle, setMathStyle] = useCanvasState("p6_math", "rose");
+    const [toast, setToast] = useCanvasState("p6_toast", null);
+    const [, setStage] = useCanvasState("p6_stage", "choose");
+    const [, setOrigins] = useCanvasState("p6_origins", []);
+    const [, setTargets] = useCanvasState("p6_targets", []);
+    const [, setApplied] = useCanvasState("p6_applied", null);
+    function resetMock() {
+        setStage("choose");
+        setOrigins([]);
+        setTargets([]);
+        setApplied(null);
+        setToast(null);
+    }
+    const labScreen = screen === "skins" || screen === "confirms";
+    const designPanel = (<div style={{
+            width: 196,
+            flex: "0 0 196px",
+            flexShrink: 0,
+            border: `1px solid ${P.line}`,
+            borderRadius: 8,
+            background: P.white,
+            padding: 8,
+            alignSelf: "flex-start",
+            maxHeight: "calc(100dvh - 24px)",
+            overflowY: "auto",
+            position: "sticky",
+            top: 8,
+        }}>
+      <Stack gap={8}>
+        <Stack gap={2}>
+          <Text size="small" weight="semibold">
+            Design Variations
+          </Text>
+          <Text size="small" tone="tertiary">
+            Click a theme — live timetable updates instantly
+          </Text>
+        </Stack>
+
+        {SKIN_GROUPS.map((group) => (<div key={group.title}>
+            <Stack gap={4}>
+              <Text size="small" tone="tertiary">
+                {group.title}
+              </Text>
+              <Row gap={4} wrap>
+                {group.skins.map((s) => (<span key={s}>
+                    <Pill active={skin === s && !labScreen} onClick={() => {
+                    setSkin(s);
+                    if (labScreen)
+                        setScreen(role === "admin" ? "active" : "move");
+                }} size="sm">
+                      {SKIN_META[s].badge}
+                    </Pill>
+                  </span>))}
+              </Row>
+            </Stack>
+          </div>))}
+
+        <Stack gap={4}>
+          <Text size="small" tone="tertiary">
+            MATH badge (⚠)
+          </Text>
+          <Row gap={4} wrap>
+            {ALL_MATH.map((m) => (<span key={m}>
+                <Pill active={mathStyle === m && !labScreen} onClick={() => {
+                setMathStyle(m);
+                if (labScreen)
+                    setScreen(role === "admin" ? "active" : "move");
+            }} size="sm">
+                  {MATH_META[m].badge}
+                </Pill>
+              </span>))}
+          </Row>
+        </Stack>
+
+        <div style={{
+            background: P.surface,
+            border: `1px solid ${P.line}`,
+            borderRadius: 6,
+            padding: 8,
+        }}>
+          <Stack gap={4}>
+            <Text size="small" weight="semibold">
+              Active: {SKIN_META[skin].badge}
+            </Text>
+            <Text size="small" tone="secondary">
+              {SKIN_META[skin].pitch}
+            </Text>
+            <Text size="small" weight="semibold">
+              MATH: {MATH_META[mathStyle].badge}
+            </Text>
+            <Text size="small" tone="secondary">
+              {MATH_META[mathStyle].pitch}
+            </Text>
+          </Stack>
+        </div>
+
+        <Row gap={4} wrap>
+          <span>
+            <Pill size="sm" active={screen === "skins"} onClick={() => setScreen("skins")}>
+              Design Lab
+            </Pill>
+          </span>
+          <span>
+            <Pill size="sm" active={screen === "confirms"} onClick={() => setScreen("confirms")}>
+              Confirm Lab
+            </Pill>
+          </span>
+        </Row>
+      </Stack>
+    </div>);
+    return (<Stack gap={8} style={{ padding: 12 }}>
+      <Stack gap={2}>
+        <H1>Absence Reallocation - Phase 1</H1>
+        <Text tone="secondary" size="small">
+          Interactive prototype: choose leave hours, then match the same number of joins.
+        </Text>
+      </Stack>
+
+      <Callout tone="info" title="How to use this prototype (for review)">
+        1. Controls: Role (PLF / SSP), Viewport, Confirm UI. 2. Design Variations (right): click a
+        skin or MATH badge — the live grid updates; read the Active pitch under the pills. 3. SSP:
+        Active Overrides → Assign Override → search PLF → matched leave/join → Apply. Cancel
+        removes an override. 4. On Join confirm, click +N more to expand facilitator names. 5.
+        Mobile: list browse with search, day chips, Open Slots, ⚠ Needs MATH.
+      </Callout>
+
+      <div style={{
+            border: `1px solid ${P.line}`,
+            borderRadius: 8,
+            background: P.surface,
+            padding: "8px 10px",
+        }}>
+        <Stack gap={10}>
+          <Row gap={8} align="center" wrap>
+            <Text size="small" weight="semibold">
+              Prototype Controls
+            </Text>
+            <Spacer />
+            <span>
+              <Pill size="sm" onClick={resetMock}>
+                Reset Demo
+              </Pill>
+            </span>
+          </Row>
+          <Row gap={8} align="center" wrap>
+            <Text size="small" tone="tertiary">
+              Role
+            </Text>
+            <span>
+              <Pill active={role === "plf"} onClick={() => {
+            setRole("plf");
+            setScreen("move");
+        }}>
+                PLF
+              </Pill>
+            </span>
+            <span>
+              <Pill active={role === "admin"} onClick={() => {
+            setRole("admin");
+            setScreen("active");
+        }}>
+                SSP
+              </Pill>
+            </span>
+            <span style={{ width: 6 }}/>
+            <Text size="small" tone="tertiary">
+              Viewport
+            </Text>
+            <span>
+              <Pill active={!narrow} onClick={() => setNarrow(false)}>
+                Desktop
+              </Pill>
+            </span>
+            <span>
+              <Pill active={narrow} onClick={() => setNarrow(true)}>
+                Mobile
+              </Pill>
+            </span>
+            <span style={{ width: 6 }}/>
+            <Text size="small" tone="tertiary">
+              Confirm UI
+            </Text>
+            <span>
+              <Pill active={confirmLayout === "tray"} onClick={() => setConfirmLayout("tray")}>
+                Sticky Tray
+              </Pill>
+            </span>
+            <span>
+              <Pill active={confirmLayout === "sidebar"} onClick={() => setConfirmLayout("sidebar")}>
+                Right Sidebar
+              </Pill>
+            </span>
+          </Row>
+        </Stack>
+      </div>
+
+      <div style={{
+            display: "flex",
+            flexDirection: "row",
+            alignItems: "flex-start",
+            gap: 10,
+            width: "100%",
+            minWidth: 0,
+        }}>
+        <div style={{
+            flex: narrow ? "0 0 420px" : "1 1 0%",
+            minWidth: narrow ? 420 : 0,
+            width: narrow ? 420 : undefined,
+            maxWidth: narrow ? 420 : undefined,
+        }}>
+          <Stack gap={8} style={{ width: "100%" }}>
+          {role === "admin" && !labScreen && (<Row gap={8}>
+              <Chip label="Active Overrides" active={screen === "active"} onClick={() => setScreen("active")}/>
+              <Chip label="Assign Override" active={screen === "move"} onClick={() => setScreen("move")}/>
+            </Row>)}
+
+          <div style={{
+            border: `1px solid ${theme.stroke.secondary}`,
+            borderRadius: 8,
+            overflow: "hidden",
+            background: P.white,
+            width: "100%",
+        }}>
+            <div style={{
+            background: P.blue800,
+            color: P.white,
+            padding: "6px 12px",
+            display: "flex",
+            alignItems: "center",
+            flexShrink: 0,
+        }}>
+              <Text size="small" weight="semibold" style={{ color: P.white }}>
+                Student Success - STEM Support
+              </Text>
+              <Spacer />
+              <Text size="small" style={{ color: "rgba(255,255,255,0.85)" }}>
+                Jack A · {role === "plf" ? "PLF" : "SSP"}
+              </Text>
+            </div>
+
+            <div style={{ display: "flex" }}>
+              {!narrow && !labScreen && (<div style={{ width: 168, flexShrink: 0, background: P.sidebar, padding: "10px 0" }}>
+                  <div style={{
+                padding: "4px 14px 8px",
+                fontSize: 10,
+                fontWeight: 600,
+                color: P.sidebarText,
+                letterSpacing: 0.4,
+            }}>
+                    {role === "plf" ? "ATTENDANCE" : "ROSTER"}
+                  </div>
+                  {(role === "plf"
+                ? ["Move A Shift", "Report Absence"]
+                : ["Active Overrides", "Assign Override"]).map((item) => {
+                const on = (role === "plf" && item === "Move A Shift") ||
+                    (role === "admin" &&
+                        ((screen === "active" && item === "Active Overrides") ||
+                            (screen === "move" && item === "Assign Override")));
+                return (<div key={item} onClick={() => {
+                        if (role === "admin") {
+                            setScreen(item === "Active Overrides" ? "active" : "move");
+                        }
+                    }} style={{
+                        padding: "7px 14px",
+                        fontSize: 12,
+                        color: on ? P.white : P.sidebarText,
+                        background: on ? "rgba(28,131,198,0.25)" : "transparent",
+                        borderLeft: on
+                            ? `3px solid ${P.sidebarActive}`
+                            : "3px solid transparent",
+                        cursor: role === "admin" ? "pointer" : "default",
+                    }}>
+                        {item}
+                      </div>);
             })}
+                </div>)}
+
+              <div style={{ flex: 1, minWidth: 0, background: P.white }}>
+                {screen === "skins" ? (<TestDesigns skin={skin} mathStyle={mathStyle} onSkin={setSkin} onMath={setMathStyle}/>) : screen === "confirms" ? (<ConfirmCompare />) : role === "plf" ? (<TimetablePicker role="plf" narrow={narrow} confirmLayout={confirmLayout} skin={skin} mathStyle={mathStyle} onApplied={(info) => setToast(info.message)}/>) : screen === "active" ? (<ActiveOverrides onAssign={() => setScreen("move")}/>) : (<AdminAssign narrow={narrow} confirmLayout={confirmLayout} skin={skin} mathStyle={mathStyle} onDone={() => setScreen("active")}/>)}
+              </div>
+            </div>
           </div>
 
-          {selectedSlot && (
-            <Card>
-              <CardHeader>
-                Target · {selectedSlot.day} {selectedSlot.time} ·{" "}
-                {selectedSlot.locationCode}
-              </CardHeader>
-              <CardBody>
-                <Stack gap={10}>
-                  <UsageBar
-                    total={Math.max(selectedSlot.max, selectedCount)}
-                    topLeftLabel="Capacity"
-                    topRightLabel={`${selectedCount} / ${selectedSlot.max}`}
-                    segments={[
-                      {
-                        id: "filled",
-                        value: selectedCount,
-                        color: LEVEL_COLOR[bandFromCount(selectedCount, selectedSlot.max)],
-                      },
-                    ]}
-                  />
+          {toast && (<div style={{
+                background: P.ink900,
+                color: P.white,
+                borderRadius: 8,
+                padding: "9px 12px",
+                fontSize: 12,
+                maxWidth: narrow ? 420 : undefined,
+            }}>
+              <Row gap={8}>
+                <span>{toast}</span>
+                <Spacer />
+                <span onClick={() => setToast(null)} style={{ cursor: "pointer", opacity: 0.7 }}>
+                  ×
+                </span>
+              </Row>
+            </div>)}
+          </Stack>
+        </div>
 
-                  {overCapWarning && (
-                    <Callout tone="warning" title="At or over hard cap (10)">
-                      PLF self-swap is blocked here. Admin/SSP can still
-                      override with an explicit warning.
-                      <Row gap={8} style={{ marginTop: 8 }}>
-                        <Pill
-                          size="sm"
-                          active={ackOverCap}
-                          onClick={() => setAckOverCap(!ackOverCap)}
-                        >
-                          Admin: acknowledge & allow
-                        </Pill>
-                      </Row>
-                    </Callout>
-                  )}
-
-                  <Stack gap={6}>
-                    <Text size="small" weight="semibold">
-                      Facilitators ({selectedCount})
-                    </Text>
-                    {selectedSlot.facilitators.slice(0, 6).map((f) => (
-                      <div
-                        key={f.name}
-                        style={{
-                          padding: "8px 10px",
-                          borderRadius: 8,
-                          border: `1px solid ${theme.stroke.tertiary}`,
-                        }}
-                      >
-                        <Row gap={8} align="center" wrap>
-                          <Text size="small" weight="semibold">
-                            {f.name}
-                          </Text>
-                          <Spacer />
-                          {f.badges.map((b) => (
-                            <span key={`${f.name}-${b}`}>
-                              <Pill size="sm">
-                                {DISCIPLINE_ICON[b] ?? "·"} {b}
-                              </Pill>
-                            </span>
-                          ))}
-                        </Row>
-                      </div>
-                    ))}
-                    {selectedCount > 6 && (
-                      <Text size="small" tone="secondary">
-                        +{selectedCount - 6} more
-                      </Text>
-                    )}
-                  </Stack>
-
-                  {!confirmed ? (
-                    <Row gap={8} wrap>
-                      <Button
-                        variant="primary"
-                        disabled={overCapWarning && !ackOverCap}
-                        onClick={() => setConfirmed(true)}
-                      >
-                        Confirm swap
-                      </Button>
-                      <Button variant="ghost" onClick={() => setSelected(null)}>
-                        Clear
-                      </Button>
-                    </Row>
-                  ) : (
-                    <Callout tone="success" title="Swap applied">
-                      Leave + Join recorded. In-app message sent.
-                      <Row gap={8} style={{ marginTop: 10 }}>
-                        <Button
-                          variant="secondary"
-                          onClick={() => {
-                            setConfirmed(false);
-                            setSelected(null);
-                          }}
-                        >
-                          Reset mock
-                        </Button>
-                      </Row>
-                    </Callout>
-                  )}
-                </Stack>
-              </CardBody>
-            </Card>
-          )}
-        </Stack>
-      )}
-
-      {screen === "ssp" && (
-        <Stack gap={14}>
-          <Row gap={10} align="center" wrap>
-            <H2 style={{ margin: 0 }}>Confirm PLF override</H2>
-            <Pill size="sm" active>
-              Admin / SSP
-            </Pill>
-          </Row>
-          <Text tone="secondary" size="small">
-            Admin confirmation — review the PLF, choose swap or add-on, then confirm the override.
-          </Text>
-          <Callout tone="warning" title="Confirm before applying">
-            This is the admin confirmation step for a PLF override. Soft max can
-            show over 10 (e.g. 13/10); warn on confirm, but do not hard-block admins.
-          </Callout>
-          <Grid columns={2} gap={12}>
-            <Card>
-              <CardHeader>Confirm override for PLF</CardHeader>
-              <CardBody>
-                <Stack gap={10}>
-                  <Table
-                    headers={["Field", "Value"]}
-                    rows={[
-                      ["Select PLF", "Taylor Chen (PLF)"],
-                      ["Week", "Week 6 (Current)"],
-                      ["Target slot", "Wed 14:00–16:00 · GP-V714 (13/10)"],
-                    ]}
-                  />
-                  <Row gap={8} wrap>
-                    <Pill
-                      active={leaveOriginal}
-                      onClick={() => setLeaveOriginal(true)}
-                    >
-                      Swap (default)
-                    </Pill>
-                    <Pill
-                      active={!leaveOriginal}
-                      onClick={() => setLeaveOriginal(false)}
-                    >
-                      Add-on
-                    </Pill>
-                  </Row>
-                  <Button variant="primary">Confirm override</Button>
-                </Stack>
-              </CardBody>
-            </Card>
-
-            <Card>
-              <CardHeader>Confirmed this week</CardHeader>
-              <CardBody>
-                <Table
-                  headers={["PLF", "Action", "Slot", "Assigned by"]}
-                  rows={OVERRIDES.map((o) => [
-                    o.plf,
-                    <span key={`${o.plf}-act`}>
-                      <ActionCell row={o} />
-                    </span>,
-                    o.kind === "swap"
-                      ? `${o.fromSlot} → ${o.toSlot}`
-                      : o.kind === "leaveOnly"
-                        ? o.fromSlot ?? ""
-                        : o.toSlot,
-                    o.assignedBy,
-                  ])}
-                />
-              </CardBody>
-            </Card>
-          </Grid>
-        </Stack>
-      )}
-    </Stack>
-  );
+        {designPanel}
+      </div>
+    </Stack>);
 }
 
+
+
 const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(<AbsenceReallocationPoc />);
+root.render(<AbsenceReallocationPhase1Prototype />);
+
   </script>
 </body>
 </html>

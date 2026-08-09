@@ -4,3 +4,7 @@ Thumbs.db
 *.swp
 .idea/
 .vscode/
+
+# Build tooling (static index.html is committed; rebuild with npm run build)
+node_modules/
+package-lock.json

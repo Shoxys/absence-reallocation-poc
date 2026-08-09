@@ -1,0 +1,21 @@
+{
+  "name": "absence-reallocation-poc",
+  "version": "2.0.0",
+  "description": "Phase 1 absence reallocation interactive UI prototype (static HTML from Cursor canvas)",
+  "private": true,
+  "scripts": {
+    "build": "node build-from-canvas.mjs",
+    "validate": "node validate.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Shoxys/absence-reallocation-poc.git"
+  },
+  "license": "ISC",
+  "homepage": "https://shoxys.github.io/absence-reallocation-poc/",
+  "devDependencies": {
+    "@babel/core": "^7.26.0",
+    "@babel/preset-react": "^7.26.0",
+    "typescript": "^5.7.3"
+  }
+}
