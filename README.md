@@ -13,9 +13,11 @@ Open `index.html` locally in a browser (no install), or use the GitHub Pages URL
 - **Ship defaults (current):** Green Capacity cell skin, Rose ⚠ Needs MATH, Right Sidebar confirm
 - **Design Variations** panel (lab only — not a product setting)
 
-Source of truth for behaviour: Cursor canvas  
-`absence-reallocation-phase1-prototype.canvas.tsx`  
-Plan: `absence_reallocation_phase_1_a7499538.plan.md`
+**Source of truth for Phase 1 UX** — agents and implementers should open this repo (or GitHub Pages) before changing Move / override UI.
+
+Backend/API plan: `absence_reallocation_phase_1_a7499538.plan.md` (Cursor plans, local to STIMulate workspace).
+
+**Authoring:** UX is edited in Cursor canvas `absence-reallocation-phase1-prototype.canvas.tsx`, then rebuilt here with `npm run build` and pushed to GitHub.
 
 ## Rebuild from the canvas
 

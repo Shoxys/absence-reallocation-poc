@@ -191,2276 +191,1962 @@ function Callout({ tone = "info", title, children }) {
 
 
 /**
- * Phase 1 prototype: interactive UI lab for absence reallocation.
+ * Move a Shift - Phase 1 prototype (ship build).
  *
- * SOURCE OF TRUTH for Phase 1 UX. Implementation plan:
- *   ~/.cursor/plans/absence_reallocation_phase_1_a7499538.plan.md
- * Agent reminder: .cursor/rules/absence-reallocation-phase1.mdc
- * If you change flows here, update that plan + rule in the same session.
+ * CANONICAL AUTHORING FILE.
+ *   Slug: c-Downloads-Stimulate-stimulate (repo root workspace).
+ *   The older c-Downloads-Stimulate-stimulate-stimulate copy is superseded.
  *
- * Static index.html export (on request): keep this file export-ready —
- * 1) All layout/visual styles are inline (no CSS modules).
- * 2) Swap useCanvasState → React.useState; drop cursor/canvas imports.
- * 3) Replace Stack/Row/Text/Pill/Btn/Callout with simple HTML + the same inline styles.
- * 4) Root shell must stay fluid: width 100%, minWidth 0, flex children with
- *    flex 1 1 0% / maxWidth soft caps (week grid ~1200, confirm 248–288). Use
- *    viewport meta + body { margin:0 } so fullscreen monitor / phone frames scale.
- * 5) Design Variations stays a fixed right strip (~196px); app frame grows beside it.
+ * Source of truth (UX): https://github.com/Shoxys/absence-reallocation-poc
+ *   Live: https://shoxys.github.io/absence-reallocation-poc/
+ * Plan: ~/.cursor/plans/absence_reallocation_phase_1_a7499538.plan.md
+ * Rule: .cursor/rules/absence-reallocation-phase1.mdc
+ * After UX edits: npm run build in the POC repo, then push, then update plan + rule.
  *
- * Ship defaults (plan): skin C Green Capacity, mathStyle rose, confirmLayout sidebar.
- * Sticky canvas state may override — use Reset Demo or clear p6_skin4 / p6_math / p6_clayout.
+ * WHAT CHANGED IN THIS REVISION
+ * 1. Ship skin locked: blue capacity cells, people pips, heat on short-staffed hours.
+ *    The 14-skin design lab and the confirm-layout A/B are gone. Right sidebar only.
+ * 2. Full-screen application, not a framed mock. Real CSS with media queries, so the
+ *    layout responds to the actual viewport instead of a Desktop/Mobile toggle.
+ * 3. Capacity is per campus (Gardens Point 10, Kelvin Grove 3), not one global number,
+ *    and pips render the campus capacity rather than a fixed ten dots.
+ * 4. Naming: "Move a Shift", "Active Shift Moves", "Move a Shift for a PLF".
+ *    No "absence", no "swap", no "override" in user-facing copy.
+ * 5. Admin-only "Move a Shift Settings" screen. SSP sees the two operational screens only.
+ *
+ * EXPORT CONTRACT (build-from-canvas.mjs)
+ * - Keep the default export name AbsenceReallocationPhase1Prototype.
+ * - Styling lives in the CSS constant below, injected as a <style> element, so the same
+ *   file renders identically in the canvas panel and in the exported static page. This is
+ *   deliberately closer to the real Bootstrap 3 + CSS implementation than inline styles were.
+ * - Only useCanvasState is imported from cursor/canvas; the build polyfills it.
  */
-const P = {
-    blue800: "#114A81",
-    blue600: "#1F6FBF",
-    blue200: "#BBD9F2",
-    blue50: "#EEF5FC",
-    ink900: "#1B2430",
-    ink600: "#5A6572",
-    ink400: "#8B95A1",
-    line: "#E4E9EF",
-    surface: "#F6F8FA",
-    white: "#FFFFFF",
-    green: "#2E7D3A",
-    greenBorder: "#6BB57A",
-    greenFill: "#EAF6ED",
-    greenDeep: "#D4EBD8",
-    greenMeter: "#4CAF66",
-    warn: "#C45F1A",
-    warnFill: "#FFF4EC",
-    alert: "#B42318",
-    alertFill: "#FEF3F2",
-    rose: "#9F1239",
-    roseFill: "#FFF1F2",
-    sidebar: "#2E3846",
-    sidebarText: "#a7b1c2",
-    sidebarActive: "#1C83C6",
+const CSS = `
+.mvs, .mvs * { box-sizing: border-box; }
+.mvs {
+  /* Warmer, lighter blues: the old set read cold on large fills. */
+  --blue-900: #0F3D6B;
+  --blue-800: #14528C;
+  --blue-600: #2C7BC9;
+  --blue-400: #7FB3E3;
+  --blue-300: #AED2F0;
+  --blue-200: #C7E0F5;
+  --blue-100: #DCECFA;
+  --blue-50:  #F2F8FD;
+
+  /* Action colours. Blue carries capacity information only; green means go, red means leaving. */
+  --go:        #2E7D3A;
+  --go-strong: #256B30;
+  --go-line:   #6BB57A;
+  --go-fill:   #EAF6ED;
+  --leave:      #C42A1E;
+  --leave-line: #E8A49E;
+  --leave-fill: #FDECEA;
+  --ink-900: #1B2430;
+  --ink-700: #384250;
+  --ink-500: #5A6572;
+  --ink-400: #8B95A1;
+  --line:    #E4E9EF;
+  --surface: #F6F8FA;
+  --white:   #FFFFFF;
+  --rose:      #9F1239;
+  --rose-fill: #FFF1F2;
+  --amber:      #B45309;
+  --amber-fill: #FFF7ED;
+  --amber-line: #F5C89A;
+
+  --cell-h: 88px;
+
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink-900);
+  background: var(--surface);
+}
+
+/* ---------- app chrome ---------- */
+.mvs__bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  height: 46px;
+  background: var(--blue-800);
+  color: var(--white);
+}
+.mvs__brand { font-weight: 600; font-size: 13px; letter-spacing: .1px; }
+.mvs__spacer { flex: 1 1 auto; }
+.mvs__who { font-size: 12px; color: rgba(255,255,255,.85); }
+.mvs__demo {
+  display: flex; align-items: center; gap: 6px;
+  padding: 3px 4px 3px 8px; border-radius: 999px;
+  background: rgba(255,255,255,.12);
+}
+.mvs__demo span { font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: rgba(255,255,255,.7); }
+.mvs__demo button {
+  border: 0; border-radius: 999px; cursor: pointer;
+  padding: 3px 9px; font: inherit; font-size: 11px; font-weight: 600;
+  background: transparent; color: rgba(255,255,255,.8);
+}
+.mvs__demo button[data-on="1"] { background: var(--white); color: var(--blue-800); }
+
+.mvs__body { flex: 1 1 auto; display: flex; min-height: 0; }
+.mvs__nav {
+  flex: 0 0 196px; width: 196px;
+  background: var(--blue-900);
+  padding: 12px 0;
+  overflow-y: auto;
+}
+.mvs__navhead {
+  padding: 4px 16px 8px; font-size: 10px; font-weight: 700;
+  letter-spacing: .6px; color: rgba(255,255,255,.5);
+}
+.mvs__navitem {
+  display: block; width: 100%; text-align: left;
+  padding: 8px 16px; font: inherit; font-size: 12.5px;
+  color: rgba(255,255,255,.72); background: transparent;
+  border: 0; border-left: 3px solid transparent; cursor: pointer;
+}
+.mvs__navitem:hover { color: var(--white); background: rgba(255,255,255,.06); }
+.mvs__navitem[data-on="1"] {
+  color: var(--white); background: rgba(31,111,191,.34); border-left-color: var(--blue-400); font-weight: 600;
+}
+.mvs__main { flex: 1 1 auto; min-width: 0; overflow-y: auto; padding: 18px 20px 28px; }
+/* The timetable fills the viewport: it is the one screen that earns the width.
+   Only the reading-heavy screens (tables, forms, pick lists) get a comfort cap. */
+.page { width: 100%; }
+.page--narrow { max-width: 960px; }
+/* Step 1 is a single focused column: the rail must not span three times the list it labels. */
+.page--step1 { max-width: 720px; }
+/* Shared column for stepper, PLF picker, and pick list — one vertical anchor. */
+.flow { width: 100%; max-width: 720px; }
+.flow .steps { margin-bottom: 18px; }
+.flow .pg__head { margin-bottom: 14px; }
+
+/* ---------- page furniture ---------- */
+.pg__title { margin: 0; font-size: 19px; font-weight: 650; }
+.pg__sub { margin: 3px 0 0; color: var(--ink-500); font-size: 12.5px; max-width: 72ch; }
+.pg__head { margin-bottom: 14px; }
+.pg__head--row { display: flex; align-items: flex-start; gap: 14px; }
+.btn--back {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 12px; flex: 0 0 auto; margin-top: 2px;
+}
+
+/* Steps: a large, centred progress rail across the top of the page.
+   Chevrons separate the stages; deliberately unlike the pill-shaped filter chips. */
+.steps {
+  display: flex; align-items: center; justify-content: center;
+  gap: 0; width: 100%; margin: 0 0 22px; padding: 18px 40px;
+  border: 1px solid var(--line); border-radius: 12px; background: var(--white);
+  overflow: visible;
+}
+.stepwrap { display: flex; align-items: center; flex: 0 0 auto; }
+.step { display: flex; align-items: center; gap: 12px; color: var(--ink-400); }
+.step b {
+  width: 40px; height: 40px; border-radius: 999px; flex: 0 0 40px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--surface); border: 2px solid var(--line);
+  color: var(--ink-400); font-size: 17px; font-weight: 700;
+}
+.step__t { font-size: 15.5px; white-space: nowrap; }
+.step[data-on="1"] { color: var(--blue-800); font-weight: 650; }
+.step[data-on="1"] b {
+  background: var(--blue-600); border-color: var(--blue-600); color: var(--white);
+  box-shadow: 0 0 0 5px var(--blue-100);
+}
+.step[data-done="1"] { color: var(--ink-500); }
+.step[data-done="1"] b { background: var(--go-fill); border-color: var(--go-line); color: var(--go); }
+.step__arrow { color: var(--ink-400); flex: 0 0 auto; margin: 0 18px; }
+
+.note {
+  border: 1px solid var(--blue-200); background: var(--blue-50);
+  border-radius: 8px; padding: 9px 12px; color: var(--ink-700); font-size: 12px;
+}
+.note--warn { border-color: var(--amber-line); background: var(--amber-fill); color: var(--amber); }
+.note--quiet { border-color: var(--line); background: var(--white); color: var(--ink-500); }
+
+/* ---------- filters ---------- */
+.filters {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 9px 11px; margin-bottom: 12px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--white);
+}
+.filters__label {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 700; letter-spacing: .4px;
+  text-transform: uppercase; color: var(--ink-400);
+}
+.filters__count {
+  padding: 1px 6px; border-radius: 999px; background: var(--blue-600);
+  color: var(--white); font-size: 10px; font-weight: 700; letter-spacing: 0;
+}
+.filters__clear {
+  border: 0; background: transparent; color: var(--blue-600);
+  font: inherit; font-size: 11.5px; cursor: pointer; text-decoration: underline;
+}
+.filters__rule { width: 1px; align-self: stretch; background: var(--line); margin: 0 2px; }
+
+.chip {
+  padding: 4px 10px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--white);
+  font: inherit; font-size: 11.5px; color: var(--ink-700);
+}
+.chip:hover { border-color: var(--blue-300); }
+.chip[data-on="1"] { border-color: var(--blue-600); background: var(--blue-50); color: var(--blue-800); font-weight: 600; }
+.chip--rose[data-on="1"] { border-color: var(--rose); background: var(--rose-fill); color: var(--rose); }
+
+.search {
+  flex: 1 1 160px; min-width: 120px;
+  padding: 5px 10px; border: 1px solid var(--line); border-radius: 6px;
+  font: inherit; font-size: 12px; color: var(--ink-900); background: var(--white);
+}
+.search:focus { outline: 2px solid var(--blue-200); outline-offset: 0; border-color: var(--blue-600); }
+
+/* ---------- layout: content + confirm sidebar ---------- */
+.work { display: flex; align-items: flex-start; gap: 14px; width: 100%; }
+.work__main { flex: 1 1 0%; min-width: 0; }
+.work__side { flex: 0 0 320px; width: 320px; position: sticky; top: 0; }
+
+/* ---------- week grid ---------- */
+/* overflow-x must stay auto at every width: with visible overflow the min-width table
+   spills out of its flex box and renders underneath the confirm sidebar.
+   Tooltips open downwards and the wrap reserves room for the last row instead. */
+.gridwrap {
+  overflow-x: auto;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--white);
+  padding-bottom: 58px; margin-bottom: -46px;
+}
+.grid { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 820px; }
+.grid th {
+  position: sticky; top: 0; z-index: 1;
+  padding: 8px 6px; font-size: 11.5px; font-weight: 650; color: var(--ink-500);
+  background: var(--surface); border-bottom: 1px solid var(--line); text-align: center;
+}
+.grid th.grid__timehead { width: 78px; text-align: right; padding-right: 10px; }
+.grid td { padding: 4px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.grid tr:last-child td { border-bottom: 0; }
+.grid__time {
+  width: 78px; text-align: right; padding-right: 10px !important;
+  font-size: 11.5px; color: var(--ink-500); white-space: nowrap; padding-top: 12px !important;
+}
+
+/* ---------- slot cell ---------- */
+/* Fixed height on every cell: a shorter cell reads as a shorter session, which is not a thing. */
+.cell {
+  position: relative; width: 100%; height: var(--cell-h);
+  display: flex; flex-direction: column; gap: 4px; justify-content: center;
+  padding: 9px 11px; border-radius: 8px; text-align: left;
+  border: 1px solid var(--line); background: var(--white);
+  font: inherit; color: var(--ink-900); cursor: default; overflow: hidden;
+}
+.cell--click { cursor: pointer; }
+.cell--click:hover { border-color: var(--blue-400); }
+/* no session: a quiet gap, so the eye lands on real hours */
+.cell--empty { height: var(--cell-h); border: 1px dashed var(--line); background: var(--surface); }
+
+/* Capacity is the ONLY thing blue says. Heat = a bolder border on short-staffed hours. */
+.cell--needs { background: var(--blue-100); border: 2px solid var(--blue-400); }
+.cell--avail { background: var(--white); border-color: var(--line); }
+.cell--cov   { background: var(--white); border-color: var(--line); }
+.cell--full  { background: var(--surface); border-color: var(--line); opacity: .58; }
+.cell--over  { background: var(--surface); border-color: var(--line); opacity: .58; }
+
+/* Selection speaks in green (go) and red (leaving), never in another blue. */
+.cell--mine    { background: var(--white); border: 1.5px dashed var(--ink-400); }
+.cell--leaving { background: var(--blue-800); border: 2px solid var(--blue-800); }
+.cell--join    { background: var(--go-fill); border: 2px solid var(--go); box-shadow: 0 0 0 3px rgba(46,125,58,.16); }
+
+.cell__top { display: flex; align-items: center; gap: 6px; }
+.cell__count { font-size: 15px; font-weight: 700; color: var(--ink-900); }
+.cell__own { font-size: 14px; font-weight: 650; }
+.cell__own--mine { color: var(--ink-700); }
+.cell__own--leaving { color: #fff; }
+.cell__hint { font-size: 11.5px; color: var(--ink-400); }
+.cell__hint--on { color: rgba(255,255,255,.78); }
+
+/* "Join 1" reads as a badge pinned to the corner, not a line competing with the count. */
+.cell__badge {
+  position: absolute; top: 50%; right: 8px; transform: translateY(-50%);
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 5px 11px; border-radius: 999px;
+  background: var(--go); color: #fff;
+  font-size: 12.5px; font-weight: 700; letter-spacing: .2px;
+  box-shadow: 0 1px 4px rgba(46,125,58,.35);
+}
+.lrow__badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 8px; border-radius: 999px;
+  background: var(--go); color: #fff; font-size: 10.5px; font-weight: 700;
+}
+.cell__of { font-weight: 500; color: var(--ink-400); font-size: 12.5px; }
+.cell__meta {
+  min-height: 22px;
+  display: flex; align-items: center; flex-shrink: 0;
+}
+.cell__state { font-size: 12px; color: var(--ink-500); }
+.cell__names { font-size: 11px; color: var(--ink-500); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cell__more { border: 0; background: transparent; padding: 0; font: inherit; font-size: 11px; color: var(--blue-600); cursor: pointer; text-decoration: underline; }
+.cell__all { margin: 2px 0 0; padding: 0; list-style: none; font-size: 11px; color: var(--ink-500); }
+.cell__all li { display: flex; gap: 5px; padding: 1px 0; }
+
+.pips { display: flex; gap: 2px; flex-wrap: wrap; align-items: center; }
+.pip { width: 7px; height: 7px; border-radius: 2px; background: var(--line); }
+.pip[data-on="1"] { background: var(--blue-600); }
+.pip--over { background: var(--amber); }
+
+.tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 1px 6px; border-radius: 4px;
+  font-size: 10px; font-weight: 700; letter-spacing: .3px; text-transform: uppercase;
+}
+.tag--yours   { background: var(--surface); color: var(--ink-500); border: 1px solid var(--line); }
+.tag--leaving { background: var(--blue-800); color: var(--white); }
+.tag--join    { background: var(--go); color: var(--white); }
+.tag--over    { background: var(--amber-fill); color: var(--amber); border: 1px solid var(--amber-line); }
+.tag__x { border: 0; background: transparent; color: inherit; cursor: pointer; font: inherit; font-size: 12px; line-height: 1; padding: 0 0 0 2px; }
+
+.cell__foot {
+  min-height: 24px; display: flex; align-items: center; flex-shrink: 0;
+}
+.needs {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: 999px;
+  background: #FEF2F2; color: #BE123C; border: 1px solid #FECDD3;
+  font-size: 10.5px; font-weight: 600; white-space: nowrap; line-height: 1.2;
+}
+.needs--muted { opacity: .55; }
+
+/* ---------- tooltip ---------- */
+.tip { position: relative; display: inline-flex; }
+.tip--block { display: block; width: 100%; }
+.tip__b {
+  position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+  z-index: 40; width: max-content; max-width: 230px;
+  padding: 7px 9px; border-radius: 6px;
+  background: var(--ink-900); color: var(--white);
+  font-size: 11px; font-weight: 400; line-height: 1.4; text-transform: none; letter-spacing: 0;
+  opacity: 0; visibility: hidden; transition: opacity .12s;
+  pointer-events: none; text-align: left;
+}
+.tip:hover .tip__b { opacity: 1; visibility: visible; }
+/* :focus-within alone kept the bubble open after a click; :focus-visible fires for keyboard only. */
+.tip:has(:focus-visible) .tip__b { opacity: 1; visibility: visible; }
+.tip:active .tip__b { opacity: 0; visibility: hidden; }
+
+/* ---------- step 1: one panel (who + hours + actions) ---------- */
+.step1 { width: 100%; }
+.step1panel {
+  border: 1px solid var(--line); border-radius: 10px; background: var(--white);
+  overflow: visible;
+}
+.step1panel__who {
+  padding: 14px 18px 13px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 10px 10px 0 0;
+}
+.step1panel__hint {
+  padding: 11px 18px 8px;
+  font-size: 11.5px; color: var(--ink-500);
+}
+.step1panel .list { gap: 0; }
+.step1panel .pickrow {
+  border: 0; border-radius: 0; border-bottom: 1px solid var(--line);
+  padding: 12px 18px; background: transparent;
+}
+.step1panel .pickrow:last-child { border-bottom: 0; }
+.step1panel .pickrow--on:last-child { border-bottom: 0; }
+.step1panel .pickrow:hover { background: var(--blue-50); border-color: var(--line); }
+.step1panel .pickrow--on {
+  background: var(--blue-50);
+  box-shadow: inset 3px 0 0 var(--blue-600);
+  border-bottom: 1px solid var(--line);
+}
+.step1panel__foot {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 0 0 10px 10px;
+}
+.step1panel__foot .btn { margin-left: auto; }
+.step1__abs { margin: 12px 2px 0; }
+
+.pickrow {
+  display: flex; align-items: center; gap: 11px; width: 100%;
+  padding: 11px 13px; border-radius: 8px; text-align: left;
+  border: 1px solid var(--line); background: var(--white);
+  font: inherit; color: var(--ink-900); cursor: pointer;
+}
+.pickrow:hover { border-color: var(--blue-400); }
+.pickrow--on { border: 1.5px solid var(--blue-600); background: var(--blue-50); }
+.pickrow__box {
+  flex: 0 0 18px; width: 18px; height: 18px; border-radius: 5px;
+  border: 1.5px solid var(--line); background: var(--white);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.pickrow__box--on { border-color: var(--blue-600); background: var(--blue-600); color: #fff; }
+.pickrow__main { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.pickrow__when { font-size: 12.5px; font-weight: 600; }
+.pickrow__where { font-size: 11.5px; color: var(--ink-500); }
+.step1foot { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+.step1foot .btn { margin-left: auto; }
+
+/* ---------- browse list ---------- */
+.list { display: flex; flex-direction: column; gap: 8px; }
+.lrow {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 10px 12px; border-radius: 8px; text-align: left;
+  border: 1px solid var(--line); background: var(--white);
+  font: inherit; color: var(--ink-900); cursor: default;
+}
+.lrow--click { cursor: pointer; }
+.lrow--click:hover { border-color: var(--blue-400); }
+.lrow--needs { background: var(--blue-100); border-color: var(--blue-400); }
+.lrow--avail { background: var(--white); border-color: var(--line); }
+.lrow--cov   { background: var(--white); border-color: var(--line); }
+.lrow--full  { background: var(--surface); opacity: .6; }
+.lrow--over  { background: var(--surface); opacity: .6; }
+.lrow--mine    { border: 1.5px dashed var(--ink-400); }
+.lrow--leaving { background: var(--blue-800); border: 2px solid var(--blue-800); }
+.lrow--join    { background: var(--go-fill); border: 2px solid var(--go); }
+.lrow__when { flex: 0 0 116px; font-size: 12.5px; font-weight: 600; }
+.lrow__mid { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.lrow__end { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+
+/* ---------- confirm sidebar ---------- */
+.side {
+  border: 1px solid var(--line); border-radius: 8px; background: var(--white);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.side__head { padding: 10px 12px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.side__title { font-size: 12.5px; font-weight: 650; }
+.side__match { font-size: 11.5px; margin-top: 2px; color: var(--ink-500); }
+.side__match b { color: var(--blue-800); }
+.side__body { padding: 10px 12px; display: flex; flex-direction: column; gap: 12px; }
+.side__group { display: flex; flex-direction: column; gap: 6px; }
+.side__label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: var(--ink-400); }
+.side__foot { padding: 10px 12px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 7px; }
+
+.pick {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 7px 9px; border-radius: 6px; border: 1px solid var(--line); background: var(--white);
+}
+.pick--leave { border-left: 3px solid var(--blue-800); }
+.pick--join  { border-left: 3px solid var(--go); }
+.pick--stale { border-color: var(--amber-line); background: var(--amber-fill); }
+.pick__main { flex: 1 1 auto; min-width: 0; }
+.pick__when { font-size: 12px; font-weight: 600; }
+.pick__meta { font-size: 11px; color: var(--ink-500); }
+.pick__warn { font-size: 11px; color: var(--amber); margin-top: 2px; }
+.faclist { margin: 2px 0 3px; padding: 0; list-style: none; }
+.faclist li { display: flex; justify-content: space-between; gap: 8px; padding: 1px 0; }
+.faclist__disc { color: var(--ink-400); flex: 0 0 auto; }
+.pick__x { border: 0; background: transparent; color: var(--ink-400); cursor: pointer; font: inherit; font-size: 14px; line-height: 1; }
+.waiting {
+  display: flex; align-items: center; gap: 9px;
+  padding: 9px 10px; border-radius: 6px;
+  border: 1.5px dashed var(--go-line); background: var(--go-fill);
+}
+.waiting__n {
+  flex: 0 0 20px; width: 20px; height: 20px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--white); border: 1.5px solid var(--go-line);
+  color: var(--go); font-size: 11px; font-weight: 700;
+}
+.waiting__t { font-size: 12px; color: var(--go-strong); font-weight: 600; }
+.pick__x:hover { color: var(--ink-900); }
+
+.btn {
+  padding: 8px 13px; border-radius: 6px; border: 1px solid var(--line);
+  background: var(--white); color: var(--ink-900);
+  font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
+}
+.btn:hover { border-color: var(--blue-400); }
+.btn--primary { background: var(--blue-600); border-color: var(--blue-600); color: var(--white); }
+.btn--primary:hover { background: var(--blue-800); border-color: var(--blue-800); }
+.btn--block { width: 100%; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn:disabled:hover { border-color: var(--line); background: var(--white); color: var(--ink-900); }
+.btn--primary:disabled:hover { background: var(--blue-600); border-color: var(--blue-600); color: var(--white); }
+.btn--link { border: 0; background: transparent; color: var(--blue-600); text-decoration: underline; padding: 0; font-weight: 500; }
+
+/* ---------- tables and cards ---------- */
+.card { border: 1px solid var(--line); border-radius: 8px; background: var(--white); overflow: hidden; }
+.card--table { overflow: visible; }
+.card__head { padding: 11px 13px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.card__title { font-size: 13px; font-weight: 650; }
+.card__sub { font-size: 11.5px; color: var(--ink-500); margin-top: 2px; }
+.card__body { padding: 13px; }
+
+.tblwrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.tbl { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.tbl col.c-plf   { width: 14%; }
+.tbl col.c-leave { width: 22%; }
+.tbl col.c-join  { width: 22%; }
+.tbl col.c-hrs   { width: 8%; }
+.tbl col.c-by    { width: 14%; }
+.tbl col.c-act   { width: 20%; }
+.tbl th {
+  text-align: left; padding: 10px 14px; font-size: 10.5px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .5px; color: var(--ink-400);
+  border-bottom: 1px solid var(--line); background: var(--surface); white-space: nowrap;
+}
+.tbl td {
+  padding: 12px 14px; border-bottom: 1px solid var(--line);
+  font-size: 12.5px; vertical-align: top;
+  overflow-wrap: break-word; word-break: break-word;
+}
+.tbl tbody tr:hover { background: var(--blue-50); }
+.tbl tr:last-child td { border-bottom: 0; }
+.tbl__plf { font-weight: 650; font-size: 13px; }
+.tbl__sub { font-size: 11px; color: var(--ink-500); margin-top: 2px; }
+.tbl__hrs { font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tbl__act { text-align: right; vertical-align: middle; }
+.tbl__act-inner {
+  display: flex; flex-wrap: wrap; align-items: center;
+  justify-content: flex-end; gap: 6px;
+}
+.colhead { display: inline-flex; align-items: center; gap: 6px; }
+.colhead::before { content: ""; width: 6px; height: 6px; border-radius: 999px; }
+.colhead--leave::before { background: var(--leave); }
+.colhead--join::before { background: var(--go); }
+.btn--danger { border-color: var(--leave-line); color: var(--leave); }
+.btn--danger:hover { background: var(--leave-fill); border-color: var(--leave); }
+.btn--compact { padding: 5px 10px; font-size: 11.5px; }
+.tbl__when { font-weight: 600; }
+.pill {
+  display: inline-block; padding: 2px 8px; border-radius: 999px;
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px;
+}
+.pill--active { background: var(--blue-50); color: var(--blue-800); border: 1px solid var(--blue-200); }
+.pill--over { background: var(--amber-fill); color: var(--amber); border: 1px solid var(--amber-line); cursor: help; }
+.mv { position: relative; padding-left: 11px; line-height: 1.5; }
+.mv::before {
+  content: ""; position: absolute; left: 0; top: 6px;
+  width: 4px; height: 4px; border-radius: 999px;
+}
+.mv--leave::before { background: var(--leave); }
+.mv--join::before { background: var(--go); }
+
+/* ---------- PLF picker ---------- */
+.plfpick { margin: 0; width: 100%; border: 0; background: transparent; overflow: visible; }
+.plfpick .card__body { padding: 0; }
+.plfpick__body { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.plfpick__field {
+  flex: 1 1 240px; min-width: 180px; max-width: none;
+  display: flex; flex-direction: row; align-items: center; gap: 10px;
+}
+.plfpick__field .side__label { flex: 0 0 auto; margin: 0; }
+.plfpick__disc { flex: 0 0 auto; }
+.plfpick__inputwrap { position: relative; }
+.plfpick__inputwrap .search { width: 100%; flex: none; padding: 7px 11px; }
+.plfpick__body .tip { flex: 0 0 auto; }
+.plfpick__menu {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 30;
+  background: var(--white); border: 1px solid var(--line); border-radius: 8px;
+  box-shadow: 0 10px 26px rgba(0,0,0,.12); overflow: hidden; max-height: 220px; overflow-y: auto;
+}
+.plfpick__opt {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  width: 100%; text-align: left; padding: 9px 12px;
+  border: 0; background: transparent; font: inherit; font-size: 12.5px; cursor: pointer;
+}
+.plfpick__opt:hover { background: var(--blue-50); }
+.plfpick__cur { font-size: 10px; color: var(--ink-400); }
+.plfpick__none { padding: 12px; font-size: 12px; color: var(--ink-500); }
+
+.empty { padding: 30px 18px; text-align: center; }
+.empty__t { font-size: 13.5px; font-weight: 650; }
+.empty__s { font-size: 12px; color: var(--ink-500); margin: 4px 0 12px; }
+
+/* ---------- settings ---------- */
+.settings { max-width: 720px; }
+.sec { margin-bottom: 18px; }
+.sec__head { display: flex; align-items: baseline; gap: 9px; margin-bottom: 9px; flex-wrap: wrap; }
+.sec__title { font-size: 12.5px; font-weight: 650; }
+.sec__note { font-size: 11.5px; color: var(--ink-500); }
+
+.captiles { display: flex; gap: 10px; flex-wrap: wrap; }
+.captile {
+  flex: 1 1 158px; min-width: 158px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--white); padding: 12px;
+  display: flex; flex-direction: column; gap: 7px;
+}
+.captile__name { font-size: 12.5px; font-weight: 600; }
+.captile__hint { font-size: 10.5px; color: var(--ink-400); margin-top: -5px; }
+.captile__row { display: flex; align-items: center; gap: 7px; }
+.captile__unit { font-size: 11.5px; color: var(--ink-500); }
+.num {
+  width: 56px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px;
+  font: inherit; font-size: 14px; font-weight: 700; text-align: center;
+  background: var(--white); color: var(--ink-900);
+}
+.num:focus { outline: 2px solid var(--blue-200); border-color: var(--blue-600); }
+
+.rules { border: 1px solid var(--line); border-radius: 8px; background: var(--white); padding: 0 13px; }
+.rule { display: flex; align-items: center; gap: 11px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.rule:last-child { border-bottom: 0; }
+.rule__main { flex: 1 1 auto; min-width: 0; }
+.rule__label { font-size: 12.5px; font-weight: 600; }
+.rule__hint { font-size: 11px; color: var(--ink-500); margin-top: 1px; }
+.rule__prev { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.rule__prevlabel { font-size: 10px; color: var(--ink-400); }
+.rule__prevcell {
+  display: flex; flex-direction: column; gap: 2px;
+  min-width: 92px; padding: 7px 9px; border-radius: 7px;
+  border: 1px solid var(--line); background: var(--surface);
+  font-size: 11.5px; opacity: .75;
+}
+.rule__fixed {
+  flex: 0 0 auto; font-size: 10px; color: var(--ink-400);
+  border: 1px solid var(--line); border-radius: 999px; padding: 1px 7px;
+}
+.sw {
+  flex: 0 0 38px; width: 38px; height: 22px; border-radius: 999px; padding: 0;
+  border: 1px solid var(--line); background: var(--surface); position: relative; cursor: pointer;
+}
+.sw--on { border-color: var(--blue-600); background: var(--blue-600); }
+.sw:disabled { opacity: .5; cursor: not-allowed; }
+.sw__dot {
+  position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+  border-radius: 999px; background: var(--white); transition: left .12s;
+}
+.sw--on .sw__dot { left: 18px; }
+
+.toast {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: 18px; z-index: 60;
+  display: flex; align-items: flex-start; gap: 10px; max-width: 460px;
+  padding: 11px 14px; border-radius: 8px;
+  background: var(--ink-900); color: var(--white); font-size: 12.5px;
+  box-shadow: 0 8px 26px rgba(0,0,0,.22);
+}
+.toast button { border: 0; background: transparent; color: rgba(255,255,255,.65); cursor: pointer; font: inherit; font-size: 15px; line-height: 1; }
+
+.only-wide { display: inline; }
+.only-narrow { display: none; }
+
+/* ---------- responsive ----------
+   >=1400  large desktop: roomier cells, wider sidebar
+   1100-1399 laptop: default
+   901-1099 small laptop / landscape iPad: narrower sidebar, tighter grid
+   <=900   portrait iPad and below: list only, sidebar becomes a sticky bottom panel
+   <=560   phone: single column, chips scroll
+------------------------------------ */
+
+@media (min-width: 1400px) {
+  .mvs__main { padding: 22px 30px 34px; }
+  .mvs { --cell-h: 104px; }
+  .work__side { flex-basis: 344px; width: 344px; }
+  .work { gap: 18px; }
+  .grid td { padding: 5px; }
+  .cell { padding: 11px 13px; }
+  .cell__count { font-size: 16px; }
+}
+
+@media (min-width: 1800px) {
+  .mvs { --cell-h: 116px; }
+  .mvs__main { padding: 26px 40px 40px; }
+  .work__side { flex-basis: 368px; width: 368px; }
+}
+
+/* Below 1100px the sidebar stops competing with the grid for width and stacks under it,
+   full-bleed. align-items must become stretch or the column children shrink to content. */
+@media (max-width: 1100px) {
+  .work { flex-direction: column; align-items: stretch; }
+  .work__main { width: 100%; }
+  .work__side {
+    position: sticky; bottom: 0; top: auto;
+    flex: 0 0 auto; width: 100%; max-width: none; z-index: 30;
+    box-shadow: 0 -6px 20px rgba(0,0,0,.10);
+    max-height: 52vh; overflow-y: auto;
+  }
+  .side__body { display: flex; flex-direction: row; flex-wrap: wrap; gap: 14px; }
+  .side__group { flex: 1 1 260px; min-width: 240px; }
+}
+
+@media (max-width: 1100px) and (min-width: 901px) {
+  .mvs { --cell-h: 84px; }
+  .cell { padding: 8px 9px; }
+  .grid th.grid__timehead, .grid__time { width: 62px; }
+  .mvs__nav { flex-basis: 164px; width: 164px; }
+}
+
+@media (max-width: 900px) {
+  .mvs__nav { display: none; }
+  .mvs__main { padding: 14px 14px 96px; }
+  .gridwrap { display: none; }
+  .only-wide { display: none; }
+  .only-narrow { display: block; }
+  .mvs__tabs { display: flex; }
+  .lrow__when { flex-basis: 96px; }
+  .steps { padding: 14px 22px; margin-bottom: 16px; }
+  .step__arrow { margin: 0 8px; width: 15px; height: 15px; }
+  .step b { width: 32px; height: 32px; flex-basis: 32px; font-size: 14px; }
+  .step__t { font-size: 13px; }
+  .settings { max-width: none; }
+  .plfpick__body { align-items: stretch; }
+}
+
+@media (max-width: 560px) {
+  .mvs__bar { height: auto; padding: 7px 12px; flex-wrap: wrap; gap: 8px; }
+  .mvs__who { display: none; }
+  .mvs__main { padding: 12px 11px 96px; }
+  .pg__title { font-size: 17px; }
+  .step1 { max-width: none; }
+  .flow { max-width: none; }
+  /* phone: numbered rail only, the active label alone keeps its text */
+  .steps { padding: 12px 16px; }
+  .step__t { display: none; }
+  .step[data-on="1"] .step__t { display: inline; font-size: 12.5px; }
+  .step__arrow { margin: 0 7px; width: 13px; height: 13px; }
+  .step b { width: 29px; height: 29px; flex-basis: 29px; font-size: 13px; }
+  .filters { gap: 6px; padding: 8px; }
+  .filters .chip { font-size: 11px; padding: 4px 8px; }
+  .lrow { flex-wrap: wrap; gap: 7px; }
+  .lrow__when { flex-basis: 100%; }
+  .lrow__end { flex-basis: 100%; flex-direction: row; align-items: center; }
+  .captiles { flex-direction: column; }
+  .captile { min-width: 0; }
+  .rule { flex-wrap: wrap; }
+  .rule__prev { width: 100%; padding-left: 49px; }
+  .work__side { max-height: 60vh; }
+  /* touch targets */
+  .btn { padding: 10px 14px; }
+  .chip { padding: 6px 11px; }
+}
+
+/* Day chips scroll rather than wrapping into a tall stack on narrow screens. */
+@media (max-width: 900px) {
+  .filters { flex-wrap: nowrap; overflow-x: auto; }
+  .filters > * { flex: 0 0 auto; }
+  .filters .search { flex: 1 0 150px; }
+}
+
+@media (min-width: 901px) { .mvs__tabs { display: none; } }
+
+.mvs__tabs {
+  gap: 6px; padding: 8px 12px; background: var(--white);
+  border-bottom: 1px solid var(--line); overflow-x: auto; flex: 0 0 auto;
+}
+.mvs__tabs .chip { white-space: nowrap; }
+`;
+const CAMPUS = {
+    gp: { short: "GP", name: "Gardens Point" },
+    kg: { short: "KG", name: "Kelvin Grove" },
+    online: { short: "Online", name: "Online" },
 };
-const HARD_CAP = 10;
-/** Demo / static HTML — fixed-height rectangular cells; app chrome hugs content */
-const DEMO_CELL_H = 56;
-const DEMO_CELL_MAX_H = 62;
-const DEMO_GRID_MAX_W = "min(1280px, 100%)";
-const LOC = {
-    gp: "Gardens Point",
-    kg: "Kelvin Grove",
-    online: "Online",
-};
+const DEFAULT_CAPS = { gp: 10, kg: 3, online: 10 };
+/** The roster's discipline. needsDiscipline is true when nobody here holds it. */
+const DISCIPLINE = { code: "MATH", short: "Maths & Science", full: "STIMulate Maths and Physical Sciences" };
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
 const TIMES = [
-    { key: "10", label: "10 AM" },
-    { key: "11", label: "11 AM" },
-    { key: "12", label: "12 PM" },
-    { key: "13", label: "1 PM" },
-    { key: "14", label: "2 PM" },
-    { key: "15", label: "3 PM" },
+    { key: "10", label: "10:00 AM" },
+    { key: "11", label: "11:00 AM" },
+    { key: "12", label: "12:00 PM" },
+    { key: "13", label: "1:00 PM" },
+    { key: "14", label: "2:00 PM" },
+    { key: "15", label: "3:00 PM" },
 ];
-const SKIN_META = {
-    A: {
-        badge: "Soft Green",
-        name: "Soft Green + Meter",
-        group: "Green capacity",
-        pitch: "Open short-staffed cells wash green with a thin fill meter.",
-    },
-    B: {
-        badge: "Green Rail",
-        name: "Green Rail",
-        group: "Green capacity",
-        pitch: "White cell with a thick green left rail on open slots.",
-    },
-    C: {
-        badge: "Green Capacity",
-        name: "Thick Green Capacity",
-        group: "Green capacity",
-        pitch: "Chunky green capacity bar that reads how full the hour is.",
-    },
-    D: {
-        badge: "Green Pips",
-        name: "Green People Pips",
-        group: "Green capacity",
-        pitch: "Ten green dots = capacity; filled dots = people on shift.",
-    },
-    K: {
-        badge: "Soft Blue",
-        name: "Soft Blue + Meter",
-        group: "Blue capacity",
-        pitch: "Same as Soft Green, but open cells wash blue.",
-    },
-    L: {
-        badge: "Blue Cap Rail",
-        name: "Blue Capacity Rail",
-        group: "Blue capacity",
-        pitch: "White cell with a thick blue left rail on open slots.",
-    },
-    M: {
-        badge: "Blue Capacity",
-        name: "Thick Blue Capacity",
-        group: "Blue capacity",
-        pitch: "Chunky blue capacity bar for open short-staffed hours.",
-    },
-    N: {
-        badge: "Blue Pips",
-        name: "Blue People Pips",
-        group: "Blue capacity",
-        pitch: "Ten blue dots = capacity; filled dots = people on shift.",
-    },
-    E: {
-        badge: "Blue→Green",
-        name: "Blue Open to Green Join",
-        group: "Blue open → green select",
-        pitch: "Open cells read blue (actionable). Selected joins turn green.",
-    },
-    F: {
-        badge: "Blue Select Rail",
-        name: "Blue Rail to Green Select",
-        group: "Blue open → green select",
-        pitch: "Blue left rail when open; full green wash when you select to join.",
-    },
-    G: {
-        badge: "Green→Blue",
-        name: "Green Open to Blue Join",
-        group: "Green open → blue select",
-        pitch: "Switched pair of Blue→Green: open stays green; selected joins turn blue.",
-    },
-    H: {
-        badge: "Green Select Rail",
-        name: "Green Rail to Blue Select",
-        group: "Green open → blue select",
-        pitch: "Switched pair of Blue Select Rail: green rail when open; blue when selected.",
-    },
-    I: {
-        badge: "Outline",
-        name: "Outline Open",
-        group: "Extra experiments",
-        pitch: "Open slots use a coloured outline only; select fills solid green.",
-    },
-    J: {
-        badge: "Heat Needs",
-        name: "Heat Needs",
-        group: "Extra experiments",
-        pitch: "Needs People cells are stronger green; Available stay soft.",
-    },
+const DISC_LABEL = {
+    MATH: "Maths & Science",
+    SCI: "Science",
+    IT: "IT",
+    ENG: "Engineering",
 };
-const MATH_META = {
-    blend: {
-        badge: "Blend",
-        pitch: "Badge tints to the cell colour underneath (green / blue / grey).",
-    },
-    amber: {
-        badge: "Amber",
-        pitch: "Warm orange warning with triangle. Softer than a hard error.",
-    },
-    alert: {
-        badge: "Alert Red",
-        pitch: "High-contrast warning red with triangle. Strongest gap signal.",
-    },
-    rose: {
-        badge: "Rose",
-        pitch: "Deep rose that stays readable on both green and blue washes.",
-    },
-};
-const ALL_SKINS = [
-    "A",
-    "B",
-    "C",
-    "D",
-    "K",
-    "L",
-    "M",
-    "N",
-    "E",
-    "F",
-    "G",
-    "H",
-    "I",
-    "J",
-];
-const SKIN_GROUPS = [
-    { title: "Green capacity", skins: ["A", "B", "C", "D"] },
-    { title: "Blue capacity", skins: ["K", "L", "M", "N"] },
-    { title: "Blue open → green select", skins: ["E", "F"] },
-    { title: "Green open → blue select", skins: ["G", "H"] },
-    { title: "Extra experiments", skins: ["I", "J"] },
-];
-const ALL_MATH = ["blend", "amber", "alert", "rose"];
-const PRIMARY_ROSTER = {
-    id: "math",
-    code: "MATH",
-    label: "Mathematics Discipline Roster",
-};
-function selectSchemeOf(skin) {
-    if (skin === "E" || skin === "F" || skin === "I")
-        return "blueOpen";
-    if (skin === "G" || skin === "H")
-        return "greenOpen";
-    return "capacity";
-}
-function capacityToneOf(skin) {
-    if (skin === "K" || skin === "L" || skin === "M" || skin === "N")
-        return "blue";
-    return "green";
-}
-function openAccentOf(skin) {
-    const scheme = selectSchemeOf(skin);
-    if (scheme === "blueOpen")
-        return "blue";
-    if (scheme === "greenOpen")
-        return "green";
-    return capacityToneOf(skin);
-}
-function selectAccentOf(skin) {
-    const scheme = selectSchemeOf(skin);
-    if (scheme === "blueOpen")
-        return "green";
-    if (scheme === "greenOpen")
-        return "blue";
-    // Capacity: opposite of open tone so select still reads clearly
-    return capacityToneOf(skin) === "blue" ? "green" : "blue";
-}
-function bulk(n, badge, prefix) {
+function many(n, disc, prefix) {
     return Array.from({ length: n }, (_, i) => ({
-        name: `${prefix} ${i + 1}`,
-        badges: [i % 2 === 0 ? badge : "SCI"],
+        name: prefix + " " + (i + 1),
+        disc: i % 3 === 0 ? disc : "SCI",
     }));
 }
-function makeSlot(day, timeKey, start, loc, people) {
-    return { id: `${day.toLowerCase()}-${timeKey}`, day, timeKey, start, loc, people };
+function slot(day, timeKey, campus, people) {
+    const t = TIMES.filter((x) => x.key === timeKey)[0];
+    return {
+        id: day.toLowerCase() + "-" + timeKey,
+        day,
+        timeKey,
+        start: t ? t.label : timeKey,
+        campus,
+        people,
+    };
 }
+/**
+ * Mock week. Tuned so the demo carries the three cases that matter:
+ * - Wed 12:00 GP is well staffed but has nobody from the roster discipline (item 4).
+ * - Thu 2:00 KG holds 13 people against a Kelvin Grove capacity of 3 (legacy over-capacity).
+ * - Kelvin Grove hours otherwise sit inside a capacity of 3, so small caps read correctly.
+ */
 const SLOTS = [
-    makeSlot("Mon", "10", "10:00 AM", "gp", [
-        { name: "Riley Ng", badges: ["MATH"] },
-        { name: "Casey Wu", badges: ["SCI"] },
-        { name: "Avery Cole", badges: ["SCI"] },
-        { name: "Quinn West", badges: ["ENG"] },
-        { name: "Blake Tran", badges: ["MATH"] },
+    slot("Mon", "10", "gp", [
+        { name: "Riley Ng", disc: "MATH" },
+        { name: "Casey Wu", disc: "SCI" },
+        { name: "Avery Cole", disc: "SCI" },
+        { name: "Quinn West", disc: "ENG" },
+        { name: "Blake Tran", disc: "MATH" },
     ]),
-    makeSlot("Mon", "11", "11:00 AM", "gp", [
-        { name: "Riley Ng", badges: ["MATH"] },
-        { name: "Casey Wu", badges: ["SCI"] },
-        { name: "Avery Cole", badges: ["SCI"] },
+    slot("Mon", "11", "gp", [
+        { name: "Riley Ng", disc: "MATH" },
+        { name: "Casey Wu", disc: "SCI" },
+        { name: "Avery Cole", disc: "SCI" },
     ]),
-    makeSlot("Mon", "12", "12:00 PM", "kg", bulk(8, "MATH", "Fac")),
-    makeSlot("Mon", "13", "1:00 PM", "kg", bulk(7, "SCI", "Fac")),
-    makeSlot("Mon", "14", "2:00 PM", "gp", [
-        { name: "You", badges: ["MATH"] },
-        { name: "Olivia D", badges: ["SCI"] },
-        { name: "Zoe D", badges: ["MATH"] },
-        { name: "Hannah W", badges: ["ENG"] },
-        { name: "Elias O", badges: ["SCI"] },
-        { name: "Nurfarahani S", badges: ["SCI"] },
+    slot("Mon", "12", "kg", [{ name: "Noor H", disc: "MATH" }]),
+    slot("Mon", "13", "kg", []),
+    slot("Mon", "14", "gp", [
+        { name: "You", disc: "MATH" },
+        { name: "Olivia D", disc: "SCI" },
+        { name: "Zoe D", disc: "MATH" },
+        { name: "Hannah W", disc: "ENG" },
+        { name: "Elias O", disc: "SCI" },
+        { name: "Nurfarahani S", disc: "SCI" },
     ]),
-    makeSlot("Mon", "15", "3:00 PM", "gp", [
-        { name: "You", badges: ["MATH"] },
-        { name: "Olivia D", badges: ["SCI"] },
-        { name: "Zoe D", badges: ["MATH"] },
-        { name: "Hannah W", badges: ["ENG"] },
+    slot("Mon", "15", "gp", [
+        { name: "You", disc: "MATH" },
+        { name: "Olivia D", disc: "SCI" },
+        { name: "Zoe D", disc: "MATH" },
+        { name: "Hannah W", disc: "ENG" },
     ]),
-    makeSlot("Tue", "10", "10:00 AM", "kg", [
-        { name: "Hamid A", badges: ["SCI"] },
-        { name: "Nathaniel R", badges: ["SCI"] },
-        { name: "Haritha G", badges: ["ENG"] },
+    slot("Tue", "10", "kg", [
+        { name: "Hamid A", disc: "SCI" },
+        { name: "Nathaniel R", disc: "MATH" },
     ]),
-    makeSlot("Tue", "11", "11:00 AM", "kg", [
-        { name: "Hamid A", badges: ["SCI"] },
-        { name: "Nathaniel R", badges: ["SCI"] },
+    slot("Tue", "11", "kg", [
+        { name: "Hamid A", disc: "SCI" },
+        { name: "Nathaniel R", disc: "MATH" },
+        { name: "Haritha G", disc: "ENG" },
     ]),
-    makeSlot("Tue", "14", "2:00 PM", "gp", bulk(10, "MATH", "Fac")),
-    makeSlot("Tue", "15", "3:00 PM", "gp", bulk(9, "SCI", "Fac")),
-    makeSlot("Wed", "10", "10:00 AM", "gp", bulk(7, "MATH", "Staff")),
-    makeSlot("Wed", "11", "11:00 AM", "gp", bulk(6, "SCI", "Staff")),
-    makeSlot("Wed", "12", "12:00 PM", "gp", [
-        { name: "Pat Rivera", badges: ["IT"] },
-        { name: "Robin Shaw", badges: ["SCI"] },
-        { name: "Sky Patel", badges: ["ENG"] },
+    slot("Tue", "12", "gp", []),
+    slot("Tue", "14", "gp", many(10, "MATH", "Fac")),
+    slot("Tue", "15", "gp", many(9, "SCI", "Fac")),
+    slot("Wed", "10", "gp", many(7, "MATH", "Staff")),
+    slot("Wed", "11", "gp", [
+        { name: "Pat Rivera", disc: "MATH" },
+        { name: "Robin Shaw", disc: "SCI" },
     ]),
-    makeSlot("Wed", "13", "1:00 PM", "gp", [
-        { name: "Pat Rivera", badges: ["IT"] },
-        { name: "Robin Shaw", badges: ["SCI"] },
+    slot("Wed", "12", "gp", [
+        { name: "Dana Ellis", disc: "ENG" },
+        { name: "Omar Reid", disc: "ENG" },
+        { name: "Tess Marlow", disc: "ENG" },
+        { name: "Ivy Chan", disc: "IT" },
+        { name: "Ravi Sood", disc: "IT" },
+        { name: "Neve Barker", disc: "ENG" },
+        { name: "Kofi Mensah", disc: "IT" },
+        { name: "Lena Vos", disc: "ENG" },
     ]),
-    makeSlot("Wed", "14", "2:00 PM", "online", [
-        { name: "Jenifer N", badges: ["MATH"] },
-        { name: "Riley C", badges: ["SCI"] },
-        { name: "Chelsea H", badges: ["SCI"] },
-        { name: "Louise M", badges: ["MATH"] },
+    slot("Wed", "13", "gp", [
+        { name: "Ivy Chan", disc: "IT" },
+        { name: "Robin Shaw", disc: "SCI" },
     ]),
-    makeSlot("Thu", "10", "10:00 AM", "kg", [
-        { name: "You", badges: ["MATH"] },
-        { name: "Rocika W", badges: ["SCI"] },
-        { name: "Malik T", badges: ["SCI"] },
-        { name: "Brandon L", badges: ["ENG"] },
-        { name: "Sophia S", badges: ["MATH"] },
-        { name: "Daisy K", badges: ["SCI"] },
+    slot("Wed", "14", "online", [
+        { name: "Jenifer N", disc: "MATH" },
+        { name: "Riley C", disc: "SCI" },
+        { name: "Chelsea H", disc: "SCI" },
+        { name: "Louise M", disc: "MATH" },
     ]),
-    makeSlot("Thu", "11", "11:00 AM", "kg", [
-        { name: "You", badges: ["MATH"] },
-        { name: "Rocika W", badges: ["SCI"] },
-        { name: "Malik T", badges: ["SCI"] },
-        { name: "Sophia S", badges: ["MATH"] },
+    slot("Thu", "10", "kg", [
+        { name: "You", disc: "MATH" },
+        { name: "Rocika W", disc: "SCI" },
+        { name: "Malik T", disc: "SCI" },
     ]),
-    makeSlot("Thu", "14", "2:00 PM", "kg", bulk(13, "MATH", "Fac")),
-    makeSlot("Thu", "15", "3:00 PM", "kg", bulk(11, "SCI", "Fac")),
-    makeSlot("Fri", "12", "12:00 PM", "online", [
-        { name: "Kate N", badges: ["SCI"] },
-        { name: "Amber J", badges: ["SCI"] },
+    slot("Thu", "11", "kg", [
+        { name: "You", disc: "MATH" },
+        { name: "Rocika W", disc: "SCI" },
     ]),
-    makeSlot("Fri", "13", "1:00 PM", "online", [{ name: "Kate N", badges: ["SCI"] }]),
-    makeSlot("Fri", "14", "2:00 PM", "gp", [
-        { name: "Felix M", badges: ["MATH"] },
-        { name: "Mason H", badges: ["SCI"] },
-        { name: "Vladyslav L", badges: ["SCI"] },
-        { name: "Reuben T", badges: ["ENG"] },
-        { name: "Iram M", badges: ["IT"] },
+    slot("Thu", "12", "kg", []),
+    slot("Thu", "14", "kg", many(13, "MATH", "Fac")),
+    slot("Thu", "15", "kg", many(4, "SCI", "Fac")),
+    slot("Fri", "12", "online", [
+        { name: "Kate N", disc: "SCI" },
+        { name: "Amber J", disc: "SCI" },
     ]),
-    makeSlot("Fri", "15", "3:00 PM", "gp", [
-        { name: "Felix M", badges: ["MATH"] },
-        { name: "Mason H", badges: ["SCI"] },
-        { name: "Iram M", badges: ["IT"] },
+    slot("Fri", "13", "online", [{ name: "Kate N", disc: "SCI" }]),
+    slot("Fri", "14", "gp", [
+        { name: "Felix M", disc: "MATH" },
+        { name: "Mason H", disc: "SCI" },
+        { name: "Vladyslav L", disc: "SCI" },
+        { name: "Reuben T", disc: "ENG" },
+        { name: "Iram M", disc: "IT" },
+    ]),
+    slot("Fri", "15", "gp", [
+        { name: "Felix M", disc: "MATH" },
+        { name: "Mason H", disc: "SCI" },
+        { name: "Iram M", disc: "IT" },
+    ]),
+    slot("Tue", "13", "gp", [
+        { name: "Marcus B", disc: "SCI" },
+        { name: "Tia L", disc: "MATH" },
+    ]),
+    slot("Wed", "15", "online", [
+        { name: "Jenifer N", disc: "MATH" },
+        { name: "Riley C", disc: "SCI" },
+    ]),
+    slot("Thu", "13", "gp", [
+        { name: "Sophia S", disc: "MATH" },
+        { name: "Daisy K", disc: "SCI" },
+        { name: "Brandon L", disc: "ENG" },
+    ]),
+    slot("Fri", "10", "gp", [
+        { name: "Ada P", disc: "MATH" },
+        { name: "Sean D", disc: "SCI" },
+        { name: "Nia F", disc: "SCI" },
+        { name: "Owen R", disc: "ENG" },
+    ]),
+    slot("Fri", "11", "gp", [
+        { name: "Ada P", disc: "MATH" },
+        { name: "Sean D", disc: "SCI" },
     ]),
 ];
 const MY_SHIFTS = ["mon-14", "mon-15", "thu-10", "thu-11"];
-const SEED_OVERRIDES = [
+const SEED_MOVES = [
     {
         id: 1,
         plf: "Alex Kim",
-        from: "Mon 2:00 PM · GP",
-        to: "Mon 10:00 AM · GP",
+        leave: ["Mon 2:00 PM, GP"],
+        join: ["Mon 10:00 AM, GP"],
         by: "Self",
-        hours: 1,
         status: "active",
     },
     {
         id: 2,
         plf: "Sam Lee",
-        from: "Tue 2:00 PM · GP + Tue 3:00 PM · GP",
-        to: "Tue 10:00 AM · KG + Wed 12:00 PM · GP",
-        by: "SSP",
-        hours: 2,
+        leave: ["Tue 2:00 PM, GP", "Tue 3:00 PM, GP"],
+        join: ["Tue 10:00 AM, KG", "Wed 12:00 PM, GP"],
+        by: "Priya N (SSP)",
         status: "active",
+        overflowReason: "Room double-booked; cleared with the coordinator.",
     },
 ];
 const PLF_OPTIONS = ["Taylor Chen", "Alex Kim", "Sam Lee", "Jordan Park", "Priya N"];
-function bandOf(n) {
-    if (n >= HARD_CAP)
+/* ---------------------------------------------------------------- logic */
+function capOf(s, caps) {
+    return caps[s.campus] || DEFAULT_CAPS[s.campus];
+}
+function plural(n, one, many) {
+    return n === 1 ? one : many;
+}
+/** Hover-only disclosure. Click stays reserved for selecting a join. */
+function peopleTitle(s) {
+    const n = s.people.length;
+    if (n === 0)
+        return "No one rostered yet";
+    return n + " " + plural(n, "person", "people") + ": " + s.people.map((x) => x.name).join(", ");
+}
+function overTitle(st) {
+    return (st.count +
+        " here, " +
+        CAMPUS[st.slot.campus].name +
+        " fits " +
+        st.max +
+        ". Rostered before the limit applied.");
+}
+/**
+ * Four staffing bands plus an over-capacity state.
+ * Ratio thresholds collapse at small capacities (at max 3 no count can ever land in
+ * "available"), so caps of four or fewer use absolute steps instead. The server
+ * GetStaffingLevel needs the same guard once capacity becomes per campus.
+ */
+function bandOf(count, max) {
+    if (count > max)
+        return "over";
+    if (count >= max)
         return "full";
-    const r = n / HARD_CAP;
+    if (max <= 4) {
+        if (count === 0)
+            return "needs";
+        if (count === max - 1)
+            return "cov";
+        return "avail";
+    }
+    const r = count / max;
     if (r <= 0.35)
         return "needs";
     if (r <= 0.65)
-        return "available";
-    return "covered";
+        return "avail";
+    return "cov";
 }
-function promoted(b) {
-    return b === "needs" || b === "available";
+const BAND_WORD = {
+    needs: "Needs people",
+    avail: "Open",
+    cov: "Well covered",
+    full: "Full",
+    over: "Over capacity",
+};
+function hasDiscipline(s) {
+    return s.people.some((p) => p.disc === DISCIPLINE.code);
 }
-function slotById(id) {
-    return id ? SLOTS.find((s) => s.id === id) : undefined;
+function fmtSlot(s) {
+    return s.day + " " + s.start + ", " + CAMPUS[s.campus].short;
 }
-function hasMath(s) {
-    return s.people.some((p) => p.badges.includes("MATH"));
+function byId(id) {
+    return SLOTS.filter((s) => s.id === id)[0];
 }
+/** Headcount after the moves already applied in this session. */
 function countOf(s, applied) {
     let n = s.people.length;
     if (applied) {
-        if (applied.origins.includes(s.id))
+        if (applied.leave.indexOf(s.id) >= 0)
             n -= 1;
-        if (applied.targets.includes(s.id))
+        if (applied.join.indexOf(s.id) >= 0)
             n += 1;
     }
     return n;
 }
-function shortFmt(s) {
-    return `${s.day} ${s.start}`;
+function peopleOf(s, applied) {
+    let list = s.people.slice();
+    if (applied) {
+        if (applied.leave.indexOf(s.id) >= 0)
+            list = list.filter((p) => p.name !== "You");
+        if (applied.join.indexOf(s.id) >= 0)
+            list = list.concat([{ name: "You", disc: "MATH" }]);
+    }
+    return list;
 }
-function overrideFmt(s) {
-    return `${s.day} ${s.start} · ${locShort(s.loc)}`;
+/* ---------------------------------------------------------------- atoms */
+function Tip(props) {
+    if (!props.text)
+        return props.children;
+    return (<span className={"tip" + (props.block ? " tip--block" : "")}>
+      {props.children}
+      <span className="tip__b">{props.text}</span>
+    </span>);
 }
-function locShort(l) {
-    return l === "gp" ? "GP" : l === "kg" ? "KG" : "Online";
+function Pips(props) {
+    const dots = Math.max(props.max, 1);
+    const over = props.count > props.max;
+    return (<span className="pips" aria-hidden="true">
+      {Array.from({ length: dots }, (_, i) => (<span key={i} className={"pip" + (over ? " pip--over" : "")} data-on={i < Math.min(props.count, dots) ? "1" : "0"}/>))}
+      {over ? <span className="pip pip--over" data-on="1" style={{ marginLeft: 3 }}/> : null}
+    </span>);
 }
-/* ---------- Icons ---------- */
-function PeopleIcon({ color = P.ink400 }) {
-    return (<svg width="12" height="12" viewBox="0 0 16 16" aria-hidden>
-      <circle cx="6" cy="5" r="2.2" fill={color}/>
-      <path d="M1.5 13c0-2.2 2-3.5 4.5-3.5S10.5 10.8 10.5 13v1h-9v-1z" fill={color}/>
-      <circle cx="11.5" cy="5.5" r="1.8" fill={color} opacity="0.85"/>
-      <path d="M11 9.2c1.7.2 3.5 1.2 3.5 3v1.3H11" fill="none" stroke={color} strokeWidth="1.4" opacity="0.85"/>
+function NeedsBadge(props) {
+    const muted = props.muted ? " needs--muted" : "";
+    return (<span className={"needs" + muted} title={"No " + DISCIPLINE.short + " facilitator here"}>
+      <Caution /> {props.short ? DISCIPLINE.short : "No " + DISCIPLINE.short}
+    </span>);
+}
+function BackArrow() {
+    return (<svg width="13" height="13" viewBox="0 0 12 12" aria-hidden style={{ flexShrink: 0 }}>
+      <path d="M10 6H3M5.8 3.2 3 6l2.8 2.8" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>);
 }
-function DiscIcon({ code, size = 12 }) {
-    const c = "#6B7280";
-    if (code === "MATH") {
-        return (<svg width={size} height={size} viewBox="0 0 16 16" aria-label="Math">
-        <rect x="2" y="1.5" width="12" height="13" rx="1.5" fill="none" stroke={c} strokeWidth="1.3"/>
-        <rect x="4" y="3.2" width="8" height="2.5" rx="0.4" fill={c} opacity="0.35"/>
-        <circle cx="5.2" cy="8.5" r="0.85" fill={c}/>
-        <circle cx="8" cy="8.5" r="0.85" fill={c}/>
-        <circle cx="10.8" cy="8.5" r="0.85" fill={c}/>
-        <circle cx="5.2" cy="11.5" r="0.85" fill={c}/>
-        <circle cx="8" cy="11.5" r="0.85" fill={c}/>
-        <circle cx="10.8" cy="11.5" r="0.85" fill={c}/>
-      </svg>);
-    }
-    if (code === "ENG") {
-        return (<svg width={size} height={size} viewBox="0 0 16 16" aria-label="English">
-        <rect x="1.5" y="4" width="6" height="6" rx="1" fill="none" stroke={c} strokeWidth="1.2"/>
-        <rect x="8.5" y="4" width="6" height="6" rx="1" fill="none" stroke={c} strokeWidth="1.2"/>
-        <text x="4.5" y="8.6" textAnchor="middle" fontSize="5.5" fill={c} fontWeight="700">A</text>
-        <text x="11.5" y="8.6" textAnchor="middle" fontSize="5.5" fill={c} fontWeight="700">Z</text>
-      </svg>);
-    }
-    if (code === "SCI") {
-        return (<svg width={size} height={size} viewBox="0 0 16 16" aria-label="Science">
-        <circle cx="8" cy="8" r="1.5" fill={c}/>
-        {[0, 60, 120, 180, 240, 300].map((deg) => {
-                const rad = (deg * Math.PI) / 180;
-                return (<circle key={deg} cx={8 + 5.1 * Math.cos(rad)} cy={8 + 5.1 * Math.sin(rad)} r="1.05" fill={c} opacity="0.75"/>);
-            })}
-      </svg>);
-    }
-    if (code === "ART") {
-        return (<svg width={size} height={size} viewBox="0 0 16 16" aria-label="Arts">
-        <path d="M3 13 L9 3 L11 4.2 L5 14.2 Z" fill="none" stroke={c} strokeWidth="1.3" strokeLinejoin="round"/>
-        <path d="M9 3 L12.5 5.5" stroke={c} strokeWidth="1.3" strokeLinecap="round"/>
-      </svg>);
-    }
-    return (<svg width={size} height={size} viewBox="0 0 16 16" aria-label="Academic">
-      <path d="M8 2.5 L14 5.5 L8 8.5 L2 5.5 Z" fill="none" stroke={c} strokeWidth="1.2" strokeLinejoin="round"/>
-      <path d="M4 6.5 V10.5 C4 12 8 13 8 13 S12 12 12 10.5 V6.5" fill="none" stroke={c} strokeWidth="1.2"/>
+function StepArrow() {
+    return (<svg className="step__arrow" width="18" height="18" viewBox="0 0 12 12" aria-hidden>
+      <path d="M2 6h7M6.2 3.2 9 6l-2.8 2.8" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>);
 }
-function CautionMark({ color, size = 11 }) {
-    return (<span aria-hidden style={{
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color,
-            fontSize: size,
-            lineHeight: 1,
-            fontWeight: 700,
-        }}>
-      ⚠
-    </span>);
+function Check(props) {
+    const n = props.big ? 18 : 11;
+    return (<svg width={n} height={n} viewBox="0 0 12 12" aria-hidden>
+      <path d="M2.5 6.3 4.8 8.6 9.5 3.9" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>);
 }
-function MathNeededBadge(props) {
-    const mathStyle = props.style ?? "blend";
-    const surface = props.surface ?? "neutral";
-    let tone = { fg: P.ink600, bg: "rgba(27,36,48,0.06)" };
-    if (mathStyle === "blend") {
-        tone =
-            surface === "green"
-                ? { fg: P.green, bg: "rgba(46,125,58,0.14)" }
-                : surface === "blue"
-                    ? { fg: P.blue600, bg: "rgba(31,111,191,0.12)" }
-                    : { fg: P.warn, bg: P.warnFill };
+function Caution() {
+    return (<svg width="10" height="10" viewBox="0 0 12 12" aria-hidden="true">
+      <path d="M6 1.2 11.2 10.6H0.8L6 1.2Z" fill="currentColor" opacity="0.92"/>
+      <rect x="5.4" y="4.4" width="1.2" height="3.1" rx="0.6" fill="#fff"/>
+      <rect x="5.4" y="8.2" width="1.2" height="1.2" rx="0.6" fill="#fff"/>
+    </svg>);
+}
+function stateOf(s, opts) {
+    const max = capOf(s, opts.caps);
+    const count = countOf(s, opts.applied);
+    const band = bandOf(count, max);
+    const people = peopleOf(s, opts.applied);
+    const mine = people.some((p) => p.name === "You");
+    const leaving = opts.leave.indexOf(s.id) >= 0;
+    const joining = opts.join.indexOf(s.id) >= 0;
+    let selectable = false;
+    let blockedReason = "";
+    if (opts.stage === "choose") {
+        selectable = mine;
     }
-    else if (mathStyle === "amber") {
-        tone = { fg: P.warn, bg: P.warnFill };
-    }
-    else if (mathStyle === "alert") {
-        tone = { fg: P.alert, bg: P.alertFill };
-    }
-    else {
-        tone = { fg: P.rose, bg: P.roseFill };
-    }
-    if (props.compact) {
-        return (<span title="Needs MATH" style={{
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: 16,
-                height: 16,
-                borderRadius: 3,
-                background: tone.bg,
-                color: tone.fg,
-            }}>
-        <CautionMark color={tone.fg} size={11}/>
-      </span>);
-    }
-    return (<span style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 4,
-            fontSize: 9,
-            fontWeight: 600,
-            color: tone.fg,
-            background: tone.bg,
-            borderRadius: 4,
-            padding: "2px 6px",
-            whiteSpace: "nowrap",
-        }}>
-      <CautionMark color={tone.fg} size={11}/>
-      Needs MATH
-    </span>);
-}
-function mathSurfaceOf(f, skin) {
-    if (f.isTarget) {
-        return selectAccentOf(skin) === "green" ? "green" : "blue";
-    }
-    if (promoted(f.band)) {
-        return openAccentOf(skin) === "blue" ? "blue" : "green";
-    }
-    return "neutral";
-}
-/* ---------- Atoms ---------- */
-function Chip(props) {
-    const { label, active, onClick } = props;
-    return (<button type="button" onClick={onClick} style={{
-            fontSize: 12,
-            fontWeight: active ? 600 : 500,
-            padding: "5px 11px",
-            borderRadius: 6,
-            border: `1px solid ${active ? P.blue600 : P.line}`,
-            background: active ? P.blue50 : P.white,
-            color: active ? P.blue600 : P.ink600,
-            cursor: onClick ? "pointer" : "default",
-        }}>
-      {label}
-    </button>);
-}
-function Btn(props) {
-    const { children, variant = "ghost", disabled, onClick } = props;
-    const styles = variant === "primary"
-        ? { bg: P.blue600, fg: P.white, bd: P.blue600 }
-        : variant === "danger"
-            ? { bg: P.white, fg: "#C42A1E", bd: P.line }
-            : { bg: P.white, fg: P.ink600, bd: P.line };
-    return (<button type="button" disabled={disabled} onClick={onClick} style={{
-            fontSize: 12,
-            fontWeight: variant === "primary" ? 600 : 500,
-            padding: "7px 14px",
-            borderRadius: 6,
-            border: `1px solid ${styles.bd}`,
-            background: styles.bg,
-            color: styles.fg,
-            cursor: disabled ? "not-allowed" : "pointer",
-            opacity: disabled ? 0.45 : 1,
-        }}>
-      {children}
-    </button>);
-}
-function CountWithPeople({ count, muted }) {
-    const color = muted ? P.ink400 : P.ink900;
-    return (<span style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 4,
-            fontSize: 12,
-            fontWeight: 700,
-            color,
-            fontVariantNumeric: "tabular-nums",
-        }}>
-      <PeopleIcon color={muted ? P.ink400 : P.ink600}/>
-      {count}/{HARD_CAP}
-    </span>);
-}
-function ThinMeter({ count, on, accent }) {
-    const fill = !on ? P.ink400 : accent === "blue" ? P.blue600 : P.greenMeter;
-    return (<div style={{ height: 3, background: P.line, borderRadius: 2, overflow: "hidden" }}>
-      <div style={{
-            height: 3,
-            width: `${Math.min((count / HARD_CAP) * 100, 100)}%`,
-            background: fill,
-        }}/>
-    </div>);
-}
-function ThickMeter({ count, on, accent }) {
-    const fill = !on ? "#C5CAD1" : accent === "blue" ? P.blue600 : P.greenMeter;
-    return (<div style={{ height: 8, background: P.line, borderRadius: 3, overflow: "hidden" }}>
-      <div style={{
-            height: 8,
-            width: `${Math.min((count / HARD_CAP) * 100, 100)}%`,
-            background: fill,
-            borderRadius: 3,
-        }}/>
-    </div>);
-}
-function PeoplePips({ count, accent }) {
-    const fill = accent === "blue" ? P.blue600 : P.greenMeter;
-    return (<div style={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
-      {Array.from({ length: HARD_CAP }, (_, i) => (<div key={i} style={{
-                width: 5,
-                height: 5,
-                borderRadius: 1,
-                background: i < Math.min(count, HARD_CAP) ? fill : P.line,
-            }}/>))}
-    </div>);
-}
-function FacilitatorsInline({ people }) {
-    // Collapsed: first names + clickable "+N more". Expand to list everyone.
-    const maxNames = 3;
-    const show = people.slice(0, maxNames);
-    const rest = people.length - show.length;
-    if (people.length === 0) {
-        return (<div style={{ fontSize: 11, color: P.ink400, lineHeight: 1.35 }}>No facilitators</div>);
-    }
-    if (rest <= 0) {
-        return (<div style={{
-                fontSize: 11,
-                color: P.ink600,
-                lineHeight: 1.35,
-                wordBreak: "break-word",
-            }}>
-        {show.map((p) => p.name).join(", ")}
-      </div>);
-    }
-    return (<details style={{ fontSize: 11, color: P.ink600, lineHeight: 1.35, minWidth: 0 }}>
-      <summary style={{
-            cursor: "pointer",
-            listStyle: "none",
-            display: "flex",
-            flexWrap: "wrap",
-            alignItems: "baseline",
-            gap: 4,
-        }}>
-        <span style={{ minWidth: 0 }}>{show.map((p) => p.name).join(", ")}</span>
-        <span style={{
-            color: P.blue600,
-            fontWeight: 700,
-            whiteSpace: "nowrap",
-            textDecoration: "underline",
-            textUnderlineOffset: 2,
-        }}>
-          +{rest} more
-        </span>
-      </summary>
-      <div style={{
-            marginTop: 6,
-            padding: "6px 8px",
-            background: P.surface,
-            border: `1px solid ${P.line}`,
-            borderRadius: 6,
-        }}>
-        <Stack gap={3}>
-          {people.map((p) => (<div key={p.name}>
-              <Row gap={6} align="center">
-                <Text size="small" style={{ color: P.ink900 }}>
-                  {p.name}
-                </Text>
-                <Text size="small" tone="tertiary">
-                  {p.badges.join(" · ")}
-                </Text>
-              </Row>
-            </div>))}
-          <Text size="small" tone="tertiary">
-            Click +N more again to collapse
-          </Text>
-        </Stack>
-      </div>
-    </details>);
-}
-function EmptySlot({ label }) {
-    return (<span style={{
-            fontSize: 11,
-            color: P.ink400,
-            border: `1.5px dashed ${P.line}`,
-            borderRadius: 6,
-            padding: "4px 10px",
-            minWidth: 72,
-            textAlign: "center",
-        }}>
-      {label}
-    </span>);
-}
-function FilledChip(props) {
-    const leave = props.kind === "leave";
-    return (<button type="button" onClick={props.locked ? undefined : props.onRemove} title={props.locked ? "At Least One Shift Must Stay Selected" : "Remove"} style={{
-            fontSize: 12,
-            fontWeight: 600,
-            color: leave ? P.blue800 : P.blue600,
-            background: leave ? P.white : P.blue50,
-            border: leave ? `1.5px dashed ${P.blue600}` : `1.5px solid ${P.blue600}`,
-            borderRadius: 6,
-            padding: "4px 8px",
-            cursor: props.locked ? "not-allowed" : "pointer",
-            opacity: props.locked ? 0.7 : 1,
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-        }}>
-      <span style={{
-            width: 14,
-            height: 14,
-            borderRadius: 8,
-            background: leave ? P.blue800 : P.blue600,
-            color: P.white,
-            fontSize: 9,
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-        }}>
-        {props.index}
-      </span>
-      {props.label}
-      {!props.locked && <span style={{ opacity: 0.55 }}>×</span>}
-    </button>);
-}
-function cellChrome(f, skin) {
-    const scheme = selectSchemeOf(skin);
-    const open = openAccentOf(skin);
-    const sel = selectAccentOf(skin);
-    const capTone = capacityToneOf(skin);
-    if (f.isOrigin) {
-        return { bg: P.white, border: `2px dashed ${P.blue800}`, opacity: 1 };
-    }
-    if (f.isMine) {
-        return {
-            bg: P.white,
-            border: `1.5px dashed ${P.blue600}`,
-            opacity: 1,
-        };
-    }
-    if (f.isTarget) {
-        if (sel === "green") {
-            return { bg: P.greenFill, border: `2px solid ${P.green}`, opacity: 1 };
+    else if (opts.stage === "join") {
+        if (mine || leaving) {
+            // Toggling your own hours stays available here, with a floor of one leave.
+            selectable = true;
         }
-        return { bg: P.blue50, border: `2px solid ${P.blue600}`, opacity: 1 };
-    }
-    if (f.band === "full") {
-        return { bg: P.surface, border: `1px solid ${P.line}`, opacity: 0.4 };
-    }
-    if (promoted(f.band)) {
-        if (skin === "I") {
-            return {
-                bg: P.white,
-                border: `1.5px solid ${open === "blue" ? P.blue600 : P.green}`,
-                opacity: 1,
-            };
+        else if (band === "full" || band === "over") {
+            selectable = opts.canExceed;
+            blockedReason = CAMPUS[s.campus].name + " fits " + max + ". This hour is full.";
         }
-        if (skin === "J") {
-            if (f.band === "needs") {
-                return { bg: P.greenDeep, border: `2px solid ${P.green}`, opacity: 1 };
-            }
-            return { bg: P.greenFill, border: `1px solid ${P.greenBorder}`, opacity: 1 };
-        }
-        if (skin === "E" || skin === "G" || skin === "A" || skin === "K") {
-            return open === "blue"
-                ? { bg: P.blue50, border: `1.5px solid ${P.blue200}`, opacity: 1 }
-                : { bg: P.greenFill, border: `1.5px solid ${P.greenBorder}`, opacity: 1 };
-        }
-        if (skin === "F" || skin === "H" || skin === "B" || skin === "L") {
-            return { bg: P.white, border: `1px solid ${P.line}`, opacity: 1 };
-        }
-        if (scheme === "capacity") {
-            return capTone === "blue"
-                ? { bg: P.blue50, border: `1.5px solid ${P.blue200}`, opacity: 1 }
-                : { bg: P.greenFill, border: `1.5px solid ${P.greenBorder}`, opacity: 1 };
+        else {
+            selectable = true;
         }
     }
     return {
-        bg: f.band === "covered" ? P.surface : P.white,
-        border: `1px solid ${P.line}`,
-        opacity: 1,
-    };
-}
-function CellBody(props) {
-    const { f, skin, loc, compact, mathStyle = "blend" } = props;
-    const on = promoted(f.band);
-    const openAcc = openAccentOf(skin);
-    const selAcc = selectAccentOf(skin);
-    const accent = f.isTarget ? selAcc : openAcc;
-    const mathSurf = mathSurfaceOf(f, skin);
-    const railColor = f.isTarget
-        ? selAcc === "green"
-            ? P.green
-            : P.blue600
-        : openAcc === "blue"
-            ? P.blue600
-            : P.greenMeter;
-    const showRail = (skin === "B" || skin === "L" || skin === "F" || skin === "H") &&
-        (on || f.isTarget) &&
-        !f.isMine &&
-        !f.isOrigin;
-    const showThin = skin === "A" || skin === "K" || skin === "E" || skin === "G";
-    const showThick = skin === "C" || skin === "M" || skin === "J";
-    const showPips = skin === "D" || skin === "N";
-    const indexBg = selAcc === "green" ? P.green : P.blue600;
-    if (f.isOrigin) {
-        return (<Stack gap={compact ? 0 : 2} style={{ minHeight: compact ? 28 : 44, justifyContent: "center" }}>
-        <Row gap={3} align="center">
-          <span style={{
-                width: compact ? 12 : 14,
-                height: compact ? 12 : 14,
-                borderRadius: 8,
-                background: P.blue800,
-                color: P.white,
-                fontSize: 8,
-                fontWeight: 700,
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-            }}>
-            {f.originIndex}
-          </span>
-          <Text size="small" style={{ color: P.blue800, fontSize: compact ? 10 : undefined }} weight="semibold">
-            {compact ? "Leave" : "Leaving"}
-          </Text>
-        </Row>
-        {!compact && (<Text size="small" tone="tertiary">
-            {f.canUndoLeave ? "Tap To Undo" : "Required"}
-          </Text>)}
-      </Stack>);
-    }
-    if (f.isMine) {
-        return (<Stack gap={compact ? 0 : 2} style={{ minHeight: compact ? 28 : 44, justifyContent: "center" }}>
-        <Text size="small" style={{ color: P.blue600, fontSize: compact ? 10 : undefined }} weight="semibold">
-          {compact ? "Yours" : "Your Shift"}
-        </Text>
-        {!compact && (<Text size="small" tone="tertiary">
-            Tap To Leave
-          </Text>)}
-      </Stack>);
-    }
-    if (compact) {
-        return (<Stack gap={1} style={{ minHeight: 28, justifyContent: "center" }}>
-        <Row gap={2} align="center">
-          <Text size="small" weight="semibold" style={{ color: f.band === "full" ? P.ink400 : P.ink900, fontSize: 11 }}>
-            {f.count}/{HARD_CAP}
-          </Text>
-          {f.isTarget && (<span style={{
-                    fontSize: 8,
-                    fontWeight: 700,
-                    color: P.white,
-                    background: indexBg,
-                    borderRadius: 8,
-                    width: 14,
-                    height: 14,
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                }}>
-              {f.targetIndex}
-            </span>)}
-          {f.gap && on && (<MathNeededBadge compact surface={mathSurf} style={mathStyle}/>)}
-        </Row>
-        {showThin && <ThinMeter count={f.count} on={on || f.isTarget} accent={accent}/>}
-        {showRail && (<div style={{
-                    position: "absolute",
-                    left: 0,
-                    top: 0,
-                    bottom: 0,
-                    width: 3,
-                    background: railColor,
-                    borderRadius: "4px 0 0 4px",
-                }}/>)}
-      </Stack>);
-    }
-    return (<Stack gap={showThick || showPips ? 4 : 2}>
-      <Row gap={4} align="center">
-        <CountWithPeople count={f.count} muted={f.band === "full"}/>
-        {f.isTarget && (<span style={{
-                fontSize: 9,
-                fontWeight: 700,
-                color: P.white,
-                background: indexBg,
-                borderRadius: 10,
-                width: 16,
-                height: 16,
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-            }}>
-            {f.targetIndex}
-          </span>)}
-      </Row>
-      {showThin && <ThinMeter count={f.count} on={on || f.isTarget} accent={accent}/>}
-      {showThick && <ThickMeter count={f.count} on={on || f.isTarget} accent={accent}/>}
-      {showPips && <PeoplePips count={f.count} accent={accent}/>}
-      {showRail && (<div style={{
-                position: "absolute",
-                left: 0,
-                top: 0,
-                bottom: 0,
-                width: 4,
-                background: railColor,
-                borderRadius: "5px 0 0 5px",
-            }}/>)}
-      {f.band === "full" ? (<Text size="small" tone="tertiary">Full</Text>) : f.gap && (on || f.isTarget) ? (<MathNeededBadge surface={mathSurf} style={mathStyle}/>) : (<Text size="small" tone="tertiary">{locShort(loc)}</Text>)}
-    </Stack>);
-}
-function GridCell(props) {
-    const { slot, applied, origins, targets, phase, skin, mathStyle = "blend", hidden, compact, onPick } = props;
-    if (!slot || hidden) {
-        return (<div style={{
-                height: "100%",
-                minHeight: compact ? 40 : DEMO_CELL_H,
-                maxHeight: compact ? 40 : DEMO_CELL_MAX_H,
-                borderRadius: compact ? 4 : 6,
-                border: `1px dashed ${P.line}`,
-                background: P.surface,
-            }}/>);
-    }
-    const count = countOf(slot, applied);
-    const band = bandOf(count);
-    const isMine = MY_SHIFTS.includes(slot.id);
-    const isOrigin = origins.includes(slot.id);
-    const isTarget = targets.includes(slot.id);
-    const gap = !hasMath(slot);
-    const plfBlocked = band === "full";
-    const canUndoLeave = isOrigin && origins.length > 1;
-    // Always allow toggling your shifts (add / remove with floor of 1)
-    // Allow join targets when not yours
-    let selectable = false;
-    if (isMine)
-        selectable = true;
-    else if (!plfBlocked || isTarget)
-        selectable = true;
-    const f = {
-        band,
+        slot: s,
         count,
-        isMine,
-        isOrigin,
-        isTarget,
-        originIndex: isOrigin ? origins.indexOf(slot.id) + 1 : 0,
-        targetIndex: isTarget ? targets.indexOf(slot.id) + 1 : 0,
-        gap,
-        phase,
-        canUndoLeave,
-    };
-    const chrome = cellChrome(f, skin);
-    const railPad = skin === "B" || skin === "L" || skin === "F" || skin === "H";
-    return (<button type="button" onClick={() => {
-            if (selectable)
-                onPick(slot.id);
-        }} style={{
-            position: "relative",
-            width: "100%",
-            minHeight: compact ? 40 : DEMO_CELL_H,
-            maxHeight: compact ? 40 : DEMO_CELL_MAX_H,
-            boxSizing: "border-box",
-            padding: compact
-                ? railPad
-                    ? "4px 4px 4px 8px"
-                    : "4px 4px"
-                : railPad
-                    ? "5px 6px 5px 9px"
-                    : "5px 6px",
-            borderRadius: compact ? 4 : 6,
-            border: chrome.border,
-            background: chrome.bg,
-            opacity: chrome.opacity,
-            cursor: selectable ? "pointer" : "default",
-            textAlign: "left",
-        }}>
-      <CellBody f={f} skin={skin} loc={slot.loc} compact={compact} mathStyle={mathStyle}/>
-    </button>);
-}
-function SlotListRow(props) {
-    const { slot, applied, origins, targets, phase, skin, mathStyle = "blend", onPick } = props;
-    const count = countOf(slot, applied);
-    const band = bandOf(count);
-    const isMine = MY_SHIFTS.includes(slot.id);
-    const isOrigin = origins.includes(slot.id);
-    const isTarget = targets.includes(slot.id);
-    const gap = !hasMath(slot);
-    const plfBlocked = band === "full";
-    const canUndoLeave = isOrigin && origins.length > 1;
-    const selectable = isMine || !plfBlocked || isTarget;
-    const on = promoted(band);
-    const f = {
+        max,
         band,
-        count,
-        isMine,
-        isOrigin,
-        isTarget,
-        originIndex: isOrigin ? origins.indexOf(slot.id) + 1 : 0,
-        targetIndex: isTarget ? targets.indexOf(slot.id) + 1 : 0,
-        gap,
-        phase,
-        canUndoLeave,
+        needs: !hasDiscipline(s) && !joining && band !== "full" && band !== "over",
+        mine,
+        leaving,
+        joining,
+        joinIndex: opts.join.indexOf(s.id) + 1,
+        selectable,
+        blockedReason,
+        peopleTitle: peopleTitle(s),
     };
-    const chrome = cellChrome(f, skin);
-    const mathSurf = mathSurfaceOf(f, skin);
-    const indexBg = selectAccentOf(skin) === "green" ? P.green : P.blue600;
-    let tag = "";
-    if (isOrigin)
-        tag = canUndoLeave ? "Leaving" : "Leaving · Keep";
-    else if (isMine)
-        tag = "Yours";
-    else if (isTarget)
-        tag = "Joining";
-    else if (band === "full")
-        tag = "Full";
-    else if (band === "needs")
-        tag = "Needs";
-    else if (band === "available")
-        tag = "Open";
+}
+function cellClass(st, base) {
+    const c = [base];
+    if (st.leaving)
+        c.push(base + "--leaving");
+    else if (st.joining)
+        c.push(base + "--join");
+    else if (st.mine)
+        c.push(base + "--mine");
     else
-        tag = "Covered";
-    return (<button type="button" onClick={() => {
-            if (selectable)
-                onPick(slot.id);
-        }} style={{
-            width: "100%",
-            textAlign: "left",
-            padding: "9px 11px",
-            borderRadius: 8,
-            border: chrome.border,
-            background: chrome.bg,
-            opacity: chrome.opacity,
-            cursor: selectable ? "pointer" : "default",
-        }}>
-      <Row gap={8} align="center">
-        <Stack gap={1} style={{ flex: 1, minWidth: 0 }}>
-          <Row gap={6} align="center" wrap>
-            <Text weight="semibold" size="small">
-              {TIMES.find((t) => t.key === slot.timeKey)?.label ?? slot.timeKey}
-            </Text>
-            <Text size="small" tone="tertiary">
-              {locShort(slot.loc)}
-            </Text>
-            <Text size="small" tone="secondary" style={{ fontVariantNumeric: "tabular-nums" }}>
-              {count}/{HARD_CAP}
-            </Text>
-            {gap && on && <MathNeededBadge surface={mathSurf} style={mathStyle}/>}
-          </Row>
-          <Text size="small" tone="tertiary">
-            {tag}
-          </Text>
-        </Stack>
-        {(isOrigin || isTarget) && (<span style={{
-                width: 20,
-                height: 20,
-                borderRadius: 10,
-                background: isOrigin ? P.blue800 : indexBg,
-                color: P.white,
-                fontSize: 10,
-                fontWeight: 700,
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-            }}>
-            {isOrigin ? origins.indexOf(slot.id) + 1 : targets.indexOf(slot.id) + 1}
-          </span>)}
-      </Row>
-    </button>);
+        c.push(base + "--" + st.band);
+    if (st.selectable)
+        c.push(base + "--click");
+    return c.join(" ");
 }
-/* ---------- Match strip / sidebar ---------- */
-function MatchStrip(props) {
-    const { origins, targets, phase, forAdmin, plfName, onRemoveOrigin, onRemoveTarget, onFocusLeaving, onFocusJoining, onConfirm, onBack, } = props;
-    const n = origins.length;
-    const ready = n > 0 && targets.length === n;
-    return (<div style={{ borderTop: `1px solid ${P.line}`, background: P.white, padding: "8px 12px" }}>
-      <Stack gap={6}>
-        <Row gap={8} align="center" wrap>
-          <Text size="small" weight="semibold">
-            {forAdmin ? `Assign ${plfName}` : "Move"} · {n}h
-          </Text>
-          <Spacer />
-          <Text size="small" style={{ color: ready ? P.green : P.ink600 }}>
-            {ready
-            ? "Ready"
-            : targets.length < n
-                ? `${n - targets.length} More To Join`
-                : "Adjust Selection"}
-          </Text>
-        </Row>
+/** PLFs see the state of a full hour, admins and SSPs see the arithmetic behind it. */
+/** PLFs see the state of a full hour, admins and SSPs see the arithmetic behind it. */
+function CountLine(props) {
+    const st = props.st;
+    return (<span className="cell__top">
+      <span className="cell__count">
+        {st.count}
+        <span className="cell__of"> / {st.max}</span>
+      </span>
+    </span>);
+}
+function SlotCell(props) {
+    const st = props.st;
+    const clickable = st.selectable;
+    // Short, plain-language tooltip on every cell: what this hour is, or why it is closed.
+    const tip = st.leaving
+        ? st.canUndoLeave
+            ? "You are leaving this hour. Tap to keep it."
+            : "You are leaving this hour. Keep at least one."
+        : st.mine
+            ? "This is your shift. Tap to leave it."
+            : st.band === "full" || st.band === "over"
+                ? st.blockedReason
+                : st.joining
+                    ? "You will join this hour. Tap to remove."
+                    : st.peopleTitle;
+    return (<Tip text={tip} block>
+      <div className={cellClass(st, "cell")} role={clickable ? "button" : undefined} tabIndex={clickable ? 0 : undefined} aria-disabled={clickable ? undefined : true} onClick={clickable ? () => props.onPick(st.slot.id) : undefined} onKeyDown={clickable
+            ? (e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    props.onPick(st.slot.id);
+                }
+            }
+            : undefined}>
+        {st.joining ? <span className="cell__badge">Join {st.joinIndex}</span> : null}
 
-        <Row gap={6} align="center" wrap>
-          <button type="button" onClick={onFocusLeaving} style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer" }}>
-            <Text size="small" weight="semibold" style={{ color: phase === "leaving" ? P.blue600 : P.ink600 }}>
-              Leave
-            </Text>
-          </button>
-          {origins.map((s, i) => (<span key={s.id}>
-              <FilledChip label={shortFmt(s)} kind="leave" index={i + 1} locked={origins.length <= 1} onRemove={() => onRemoveOrigin(s.id)}/>
-            </span>))}
-
-          <Text size="small" tone="tertiary">→</Text>
-
-          <button type="button" onClick={onFocusJoining} style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer" }}>
-            <Text size="small" weight="semibold" style={{ color: phase === "joining" ? P.blue600 : P.ink600 }}>
-              Join
-            </Text>
-          </button>
-          {Array.from({ length: n }, (_, i) => {
-            const s = targets[i];
-            return s ? (<span key={s.id}>
-                <FilledChip label={shortFmt(s)} kind="join" index={i + 1} onRemove={() => onRemoveTarget(s.id)}/>
-              </span>) : (<span key={`jo-${i}`}>
-                <EmptySlot label={`#${i + 1}`}/>
-              </span>);
-        })}
-
-          <Spacer />
-          <Btn onClick={onBack}>Back</Btn>
-          <Btn variant="primary" disabled={!ready} onClick={onConfirm}>
-            {forAdmin ? "Apply" : "Confirm"}
-          </Btn>
-        </Row>
-
-        {targets.map((t) => (<div key={`ppl-${t.id}`} style={{ minWidth: 0 }}>
-            <Text size="small" tone="tertiary">
-              {shortFmt(t)}
-            </Text>
-            <FacilitatorsInline people={t.people}/>
-          </div>))}
-      </Stack>
+        {st.leaving ? (<>
+            <span className="cell__own cell__own--leaving">Leaving</span>
+            <span className="cell__hint cell__hint--on">
+              {st.canUndoLeave ? "Tap to keep" : "Keep 1 minimum"}
+            </span>
+          </>) : st.mine ? (<>
+            <span className="cell__own cell__own--mine">Your shift</span>
+            <span className="cell__hint">Tap to leave</span>
+          </>) : st.band === "full" || st.band === "over" ? (<>
+            <span className="cell__state" style={{ fontWeight: 650 }}>
+              Full
+            </span>
+            {props.showExact ? (<span className="cell__hint">
+                {st.count} of {st.max}
+                {st.band === "over" ? " · " + (st.count - st.max) + " over" : ""}
+              </span>) : null}
+          </>) : (<>
+            <CountLine st={st} showExact={props.showExact}/>
+            <Pips count={st.count} max={st.max}/>
+            <span className="cell__foot">
+              {st.needs ? (<NeedsBadge />) : !hasDiscipline(st.slot) && st.joining ? (<NeedsBadge muted short />) : (<span className="cell__state">{CAMPUS[st.slot.campus].short}</span>)}
+            </span>
+          </>)}
+      </div>
+    </Tip>);
+}
+function SlotRow(props) {
+    const st = props.st;
+    const bland = st.band === "full" || st.band === "over";
+    const own = st.mine || st.leaving;
+    return (<div className={cellClass(st, "lrow")} role={st.selectable ? "button" : undefined} tabIndex={st.selectable ? 0 : undefined} aria-disabled={st.selectable ? undefined : true} onClick={st.selectable ? () => props.onPick(st.slot.id) : undefined} onKeyDown={st.selectable
+            ? (e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    props.onPick(st.slot.id);
+                }
+            }
+            : undefined} title={!st.selectable && st.blockedReason ? st.blockedReason : undefined}>
+      <span className="lrow__when" style={st.leaving ? { color: "#fff" } : undefined}>
+        {st.slot.day} {st.slot.start}
+      </span>
+      <span className="lrow__mid">
+        {own ? (<span className={"cell__own " + (st.leaving ? "cell__own--leaving" : "cell__own--mine")}>
+            {st.leaving ? "Leaving" : "Your shift"}
+          </span>) : bland ? (<>
+            <span className="cell__state" style={{ fontWeight: 650 }}>
+              Full
+            </span>
+            {props.showExact ? (<span className="cell__state">
+                {st.count} of {st.max}
+                {st.band === "over" ? " · " + (st.count - st.max) + " over" : ""}
+              </span>) : null}
+          </>) : (<>
+            <span className="cell__top">
+              <span className="cell__count" title={st.peopleTitle}>
+                {st.count}
+                <span className="cell__of"> / {st.max}</span>
+              </span>
+              <Pips count={st.count} max={st.max}/>
+            </span>
+            <span className="cell__state">{CAMPUS[st.slot.campus].name}</span>
+          </>)}
+      </span>
+      <span className="lrow__end">
+        {!own && !bland ? (
+          st.needs || (!hasDiscipline(st.slot) && st.joining) ? (
+            <NeedsBadge muted={st.joining && !st.needs} short={st.joining && !st.needs} />
+          ) : null
+        ) : null}
+        {st.joining ? <span className="tag tag--join">Join {st.joinIndex}</span> : null}
+      </span>
     </div>);
 }
-function SidebarConfirm(props) {
-    const { origins, targets, phase, forAdmin, plfName, onRemoveOrigin, onRemoveTarget, onFocusLeaving, onFocusJoining, onConfirm, onBack, } = props;
-    const n = origins.length;
-    const ready = n > 0 && targets.length === n;
-    return (<div style={{
-            flex: "1 0 256px",
-            minWidth: 248,
-            maxWidth: 288,
-            borderLeft: `1px solid ${P.line}`,
-            background: P.white,
-            padding: 14,
-            display: "flex",
-            flexDirection: "column",
-            gap: 10,
-            boxSizing: "border-box",
-            alignSelf: "stretch",
-            overflowY: "auto",
-        }}>
-      <Stack gap={2}>
-        <Text weight="semibold">{forAdmin ? `Assign ${plfName}` : "Confirm Move"}</Text>
-        <Text size="small" tone="secondary">
-          {n} Hour{n === 1 ? "" : "s"} Matched
-        </Text>
-      </Stack>
-
-      <Stack gap={5}>
-        <button type="button" onClick={onFocusLeaving} style={{ border: "none", background: "transparent", padding: 0, textAlign: "left", cursor: "pointer" }}>
-          <Text size="small" weight="semibold" style={{ color: phase === "leaving" ? P.blue600 : P.ink600 }}>
-            Leave ({origins.length})
-          </Text>
-        </button>
-        <Row gap={5} wrap>
-          {origins.map((s, i) => (<span key={s.id}>
-              <FilledChip label={shortFmt(s)} kind="leave" index={i + 1} locked={origins.length <= 1} onRemove={() => onRemoveOrigin(s.id)}/>
-            </span>))}
-        </Row>
-      </Stack>
-
-      <Stack gap={5}>
-        <button type="button" onClick={onFocusJoining} style={{ border: "none", background: "transparent", padding: 0, textAlign: "left", cursor: "pointer" }}>
-          <Text size="small" weight="semibold" style={{ color: phase === "joining" ? P.blue600 : P.ink600 }}>
-            Join ({targets.length}/{n})
-          </Text>
-        </button>
-        {targets.map((t, i) => (<div key={t.id} style={{ minWidth: 0 }}>
-            <FilledChip label={shortFmt(t)} kind="join" index={i + 1} onRemove={() => onRemoveTarget(t.id)}/>
-            <div style={{ marginTop: 4 }}>
-              <FacilitatorsInline people={t.people}/>
+/* ---------------------------------------------------------------- flow */
+function Steps(props) {
+    const at = props.stage === "choose" ? 1 : props.stage === "join" ? 2 : 3;
+    const items = ["Choose hours to leave", "Pick hours to join", "Confirm"];
+    return (<div className="steps">
+      {items.map((label, i) => {
+            const n = i + 1;
+            return (<div key={label} className="stepwrap">
+            {i > 0 ? <StepArrow /> : null}
+            <div className="step" data-on={n === at ? "1" : "0"} data-done={n < at ? "1" : "0"}>
+              <b>{n < at ? <Check big/> : n}</b>
+              <span className="step__t">{label}</span>
             </div>
-          </div>))}
-        {Array.from({ length: Math.max(0, n - targets.length) }, (_, i) => (<span key={`empty-${i}`}>
-            <EmptySlot label={`#${targets.length + i + 1}`}/>
-          </span>))}
-      </Stack>
-
-      <Spacer />
-      <Btn variant="primary" disabled={!ready} onClick={onConfirm}>
-        {forAdmin ? "Apply Override" : "Confirm Move"}
-      </Btn>
-      <Btn onClick={onBack}>{forAdmin ? "Back To Leave Hours" : "Back To Your Shifts"}</Btn>
+          </div>);
+        })}
     </div>);
 }
-/* ---------- Choose-shifts gate ---------- */
-function ChooseShifts(props) {
-    const { role, adminPlf, rosterLabel, selected, onToggle, onContinue, applied, onUndoApplied } = props;
-    const mine = MY_SHIFTS.map((id) => slotById(id));
-    const isAdmin = role === "admin";
-    return (<Stack gap={12} style={{ padding: isAdmin ? "12px 14px" : 16, maxWidth: 520 }}>
-      <Stack gap={3}>
-        <div style={{ fontSize: 17, fontWeight: 600, color: P.ink900 }}>
-          {isAdmin ? `Leave Hours For ${adminPlf}` : "Move A Shift"}
-        </div>
-        <Text size="small" tone="secondary">
-          {isAdmin
-            ? `Week 6 · Select which of ${adminPlf}'s shifts to leave${rosterLabel ? ` · ${rosterLabel}` : ""}`
-            : "Week 6 · STEM Drop-In · Select hours you cannot make"}
-        </Text>
-      </Stack>
-
-      {applied && role === "plf" && (<div style={{
-                background: P.blue50,
-                borderRadius: 8,
-                padding: "8px 10px",
-                border: `1px solid ${P.blue200}`,
-            }}>
-          <Row gap={8} align="center" wrap>
-            <Text size="small" weight="semibold" style={{ color: P.blue800 }}>
-              Moved This Week
-            </Text>
-            <Text size="small">
-              {applied.origins.map((id) => shortFmt(slotById(id))).join(" + ")} →{" "}
-              {applied.targets.map((id) => shortFmt(slotById(id))).join(" + ")}
-            </Text>
-            <Spacer />
-            <Btn onClick={onUndoApplied}>Undo</Btn>
-          </Row>
-        </div>)}
-
-      <Stack gap={6}>
-        <Text weight="semibold">
-          {isAdmin ? `${adminPlf}'s Shifts This Week` : "Your Shifts This Week"}
-        </Text>
-        <Text size="small" tone="secondary">
-          {isAdmin
-            ? "Pick the hours this PLF will leave. Keep at least one selected, then continue."
-            : "Select the hours you cannot make. Keep at least one selected, then continue."}
-        </Text>
-
-        <Stack gap={6}>
-          {mine.map((s) => {
-            const on = selected.includes(s.id);
-            return (<button key={s.id} type="button" onClick={() => onToggle(s.id)} style={{
-                    textAlign: "left",
-                    padding: "10px 12px",
-                    borderRadius: 8,
-                    border: on ? `1.5px solid ${P.blue600}` : `1px solid ${P.line}`,
-                    background: on ? P.blue50 : P.white,
-                    cursor: "pointer",
-                }}>
-                <Row gap={10} align="center">
-                  <span style={{
-                    width: 18,
-                    height: 18,
-                    borderRadius: 4,
-                    border: `1.5px solid ${on ? P.blue600 : P.line}`,
-                    background: on ? P.blue600 : P.white,
-                    color: P.white,
-                    fontSize: 11,
-                    fontWeight: 700,
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                }}>
-                    {on ? "✓" : ""}
-                  </span>
-                  <Stack gap={2}>
-                    <Text size="small" weight="semibold">
-                      {shortFmt(s)}
-                    </Text>
-                    <Text size="small" tone="tertiary">
-                      {LOC[s.loc]}
-                    </Text>
-                  </Stack>
-                </Row>
-              </button>);
-        })}
-        </Stack>
-
-        <Row gap={8} align="center">
-          <Text size="small" tone="tertiary">
-            {selected.length} Selected
-          </Text>
-          <Spacer />
-          <Btn variant="primary" disabled={selected.length === 0} onClick={onContinue}>
-            {isAdmin ? "Continue To Assign" : "Continue To Timetable"}
-          </Btn>
-        </Row>
-      </Stack>
-    </Stack>);
+function Filters(props) {
+    const active = (props.openOnly ? 1 : 0) + (props.needsOnly ? 1 : 0) + (props.day !== "All" ? 1 : 0) + (props.query ? 1 : 0);
+    return (<div className="filters">
+      <span className="filters__label">
+        Filters
+        {active > 0 ? <span className="filters__count">{active}</span> : null}
+      </span>
+      <button type="button" className="chip" data-on={props.openOnly ? "1" : "0"} onClick={props.onOpen} title="Hours that are short of people, where a move helps most">
+        Needs people
+      </button>
+      <button type="button" className="chip chip--rose" data-on={props.needsOnly ? "1" : "0"} onClick={props.onNeeds}>
+        No {DISCIPLINE.short}
+      </button>
+      <span className="filters__rule"/>
+      {["All"].concat(DAYS).map((d) => (<button key={d} type="button" className="chip" data-on={props.day === d ? "1" : "0"} onClick={() => props.onDay(d)}>
+          {d}
+        </button>))}
+      <input className="search" placeholder="Search hours or people" value={props.query} onChange={(e) => props.onQuery(e.target.value)}/>
+      <span className="only-wide">
+        <span className="filters__rule"/>
+      </span>
+      <span className="only-wide">
+        <button type="button" className="chip" data-on={props.view === "week" ? "1" : "0"} onClick={() => props.onView("week")}>
+          Week grid
+        </button>
+      </span>
+      <span className="only-wide">
+        <button type="button" className="chip" data-on={props.view === "list" ? "1" : "0"} onClick={() => props.onView("list")}>
+          Browse list
+        </button>
+      </span>
+      {active > 0 ? (<button type="button" className="filters__clear" onClick={props.onClear}>
+          Clear filters
+        </button>) : null}
+    </div>);
 }
-/* ---------- Timetable picker ---------- */
-function TimetablePicker(props) {
-    const { role, narrow, confirmLayout, skin, mathStyle = "blend", adminPlf, rosterLabel, rosterCode, onApplied } = props;
-    const prefix = role === "admin" ? "p6a" : "p6";
-    const [stage, setStage] = useCanvasState(`${prefix}_stage`, "choose");
-    const [origins, setOrigins] = useCanvasState(`${prefix}_origins`, []);
-    const [targets, setTargets] = useCanvasState(`${prefix}_targets`, []);
-    const [phase, setPhase] = useCanvasState(`${prefix}_phase`, "joining");
-    const [applied, setApplied] = useCanvasState(`${prefix}_applied`, null);
-    const [fNeeds, setFNeeds] = useCanvasState(`${prefix}_fneeds`, false);
-    const [fMath, setFMath] = useCanvasState(`${prefix}_fmath`, false);
-    const [hint, setHint] = useCanvasState(`${prefix}_hint`, null);
-    const [viewPref, setViewPref] = useCanvasState(`${prefix}_view2`, "week");
-    const [dayFilter, setDayFilter] = useCanvasState(`${prefix}_day`, "All");
-    const [query, setQuery] = useCanvasState(`${prefix}_q`, "");
-    // Mobile: list only. Desktop: week by default, list optional.
-    const view = narrow ? "list" : viewPref;
-    const originSlots = origins.map((id) => slotById(id)).filter((s) => !!s);
-    const targetSlots = targets.map((id) => slotById(id)).filter((s) => !!s);
-    function trimJoins(nextOrigins) {
-        if (targets.length > nextOrigins.length) {
-            setTargets(targets.slice(0, nextOrigins.length));
-        }
-    }
-    function removeOrigin(id) {
-        if (origins.length <= 1) {
-            setHint("Keep At Least One Shift Selected To Leave");
-            return;
-        }
-        const next = origins.filter((x) => x !== id);
-        setOrigins(next);
-        trimJoins(next);
-        setHint(null);
-        setPhase("leaving");
-    }
-    function addOrigin(id) {
-        if (!MY_SHIFTS.includes(id))
-            return;
-        if (origins.includes(id))
-            return;
-        const next = [...origins, id];
-        setOrigins(next);
-        setHint(null);
-    }
-    function removeTarget(id) {
-        setTargets(targets.filter((x) => x !== id));
-        setPhase("joining");
-    }
-    function pick(id) {
-        // Your shifts: toggle leave (floor of 1)
-        if (MY_SHIFTS.includes(id)) {
-            if (origins.includes(id)) {
-                removeOrigin(id);
-            }
-            else {
-                addOrigin(id);
-                // After adding a leave, need another join: clear excess? joins stay, need more
-                setPhase("joining");
-            }
-            return;
-        }
-        // Join targets
-        if (origins.includes(id))
-            return;
-        if (targets.includes(id)) {
-            removeTarget(id);
-            return;
-        }
-        if (targets.length >= origins.length) {
-            // Replace last join rather than exceed leave count
-            setTargets([...targets.slice(0, origins.length - 1), id]);
-            setPhase("joining");
-            return;
-        }
-        setTargets([...targets, id]);
-        setPhase("joining");
-        setHint(null);
-    }
-    function confirm() {
-        if (origins.length === 0 || targets.length !== origins.length)
-            return;
-        setApplied({ origins: [...origins], targets: [...targets] });
-        const from = originSlots.map(overrideFmt).join(" + ");
-        const to = targetSlots.map(overrideFmt).join(" + ");
-        onApplied?.({
-            message: role === "admin"
-                ? `Override Applied For ${adminPlf}`
-                : `Moved ${originSlots.map(shortFmt).join(" + ")} → ${targetSlots.map(shortFmt).join(" + ")}`,
-            from,
-            to,
-            hours: origins.length,
-        });
-        setOrigins([]);
-        setTargets([]);
-        setStage("choose");
-        setPhase("joining");
-    }
-    function backToChoose() {
-        setStage("choose");
-        setTargets([]);
-        setPhase("joining");
-        setHint(null);
-    }
-    function filteredOut(s) {
-        if (fNeeds && !promoted(bandOf(countOf(s, applied))))
-            return true;
-        if (fMath && hasMath(s))
-            return true;
-        if (dayFilter !== "All" && s.day !== dayFilter)
-            return true;
-        if (query.trim()) {
-            const q = query.trim().toLowerCase();
-            const hay = `${s.day} ${s.start} ${LOC[s.loc]} ${locShort(s.loc)}`.toLowerCase();
-            if (!hay.includes(q))
-                return true;
-        }
-        return false;
-    }
-    const needsCount = SLOTS.filter((s) => bandOf(countOf(s, applied)) === "needs").length;
-    const useSidebar = confirmLayout === "sidebar" && !narrow && stage === "move";
-    const showTray = (confirmLayout === "tray" || narrow) && stage === "move";
-    const listSlots = SLOTS.filter((s) => !filteredOut(s))
-        .slice()
-        .sort((a, b) => {
-        const di = DAYS.indexOf(a.day) -
-            DAYS.indexOf(b.day);
-        if (di !== 0)
-            return di;
-        return (TIMES.findIndex((t) => t.key === a.timeKey) - TIMES.findIndex((t) => t.key === b.timeKey));
-    });
-    if (stage === "choose") {
-        return (<ChooseShifts role={role} adminPlf={adminPlf} rosterLabel={rosterLabel} rosterCode={rosterCode} selected={origins} onToggle={(id) => {
-                // On the choose screen, allow clearing to re-pick; Continue stays disabled at 0.
-                if (origins.includes(id)) {
-                    setOrigins(origins.filter((x) => x !== id));
-                }
-                else {
-                    setOrigins([...origins, id]);
-                }
-                setHint(null);
-            }} onContinue={() => {
-                if (origins.length === 0)
-                    return;
-                setTargets([]);
-                setPhase("joining");
-                setStage("move");
-                setHint(null);
-            }} applied={applied} onUndoApplied={() => {
-                setApplied(null);
-                onApplied?.({ message: "Move Undone", from: "", to: "", hours: 0 });
-            }}/>);
-    }
-    const stripProps = {
-        origins: originSlots,
-        targets: targetSlots,
-        phase,
-        forAdmin: role === "admin",
-        plfName: adminPlf,
-        onRemoveOrigin: removeOrigin,
-        onRemoveTarget: removeTarget,
-        onFocusLeaving: () => setPhase("leaving"),
-        onFocusJoining: () => setPhase("joining"),
-        onConfirm: confirm,
-        onBack: backToChoose,
-    };
-    const grid = (<Stack gap={8} style={{ padding: narrow ? 10 : 12, flex: 1, minWidth: 0 }}>
-      <Stack gap={2}>
-        <div style={{ fontSize: 16, fontWeight: 600, color: P.ink900 }}>
-          {role === "admin" ? `Join Hours For ${adminPlf}` : "Move A Shift"}
-        </div>
-        <Text size="small" tone="secondary">
-          {role === "admin"
-            ? `Leave ${origins.length} · Join ${origins.length} for ${adminPlf}${rosterLabel ? ` · ${rosterLabel}` : ""}`
-            : `Leave ${origins.length} · Join ${origins.length} · Undo leave with × (keep ≥1)`}
-        </Text>
-      </Stack>
-
-      {hint && (<div style={{
-                background: P.warnFill,
-                borderRadius: 6,
-                padding: "8px 10px",
-                fontSize: 12,
-                color: P.warn,
-                fontWeight: 600,
-            }}>
-          {hint}
-        </div>)}
-
-      {!narrow && (<Row gap={4}>
-          <Chip label="Week Grid" active={view === "week"} onClick={() => setViewPref("week")}/>
-          <Chip label="Browse List" active={view === "list"} onClick={() => setViewPref("list")}/>
-        </Row>)}
-
-      {view === "week" && (<Stack gap={6}>
-          <Row gap={6} wrap>
-            <Chip label={`Open Slots (${needsCount})`} active={fNeeds} onClick={() => setFNeeds(!fNeeds)}/>
-            <Chip label="⚠ Needs MATH" active={fMath} onClick={() => setFMath(!fMath)}/>
-          </Row>
-          <div style={{
-                border: `1px solid ${P.line}`,
-                borderRadius: 8,
-                padding: 8,
-                background: P.white,
-                overflowX: "auto",
-            }}>
-            <div style={{
-                width: "100%",
-                minWidth: 520,
-                maxWidth: DEMO_GRID_MAX_W,
-                margin: "0 auto",
-            }}>
-              <div style={{ display: "flex", gap: 5, marginBottom: 4 }}>
-                <div style={{ width: 44, flexShrink: 0 }}/>
-                {DAYS.map((d) => (<div key={d} style={{
-                    flex: "1 1 0",
-                    minWidth: 88,
-                    textAlign: "center",
-                    fontSize: 11,
-                    fontWeight: 600,
-                    color: P.ink600,
-                    padding: "4px 0",
-                }}>
-                    {d}
-                  </div>))}
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                {TIMES.map((t) => (<div key={t.key} style={{
-                    display: "flex",
-                    gap: 5,
-                    alignItems: "stretch",
-                }}>
-                    <div style={{
-                    width: 44,
-                    fontSize: 10,
-                    color: P.ink400,
-                    paddingTop: 8,
-                    flexShrink: 0,
-                }}>
-                      {t.label}
-                    </div>
-                    {DAYS.map((d) => {
-                    const s = SLOTS.find((x) => x.day === d && x.timeKey === t.key);
-                    return (<div key={d} style={{ flex: "1 1 0", minWidth: 88 }}>
-                          <GridCell slot={s} applied={applied} origins={origins} targets={targets} phase={phase} skin={skin} mathStyle={mathStyle} hidden={!!s && filteredOut(s)} onPick={pick}/>
-                        </div>);
-                })}
-                  </div>))}
-              </div>
-            </div>
-          </div>
-        </Stack>)}
-
-      {view === "list" && (<Stack gap={8}>
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search day, time, or location..." style={{
-                width: "100%",
-                boxSizing: "border-box",
-                fontSize: 13,
-                padding: "9px 11px",
-                borderRadius: 8,
-                border: `1px solid ${P.line}`,
-                background: P.white,
-                color: P.ink900,
-            }}/>
-          <Row gap={4} wrap>
-            {["All", ...DAYS].map((d) => (<span key={d}>
-                <Chip label={d} active={dayFilter === d} onClick={() => setDayFilter(d)}/>
-              </span>))}
-          </Row>
-          <Row gap={4} wrap>
-            <Chip label={`Open Slots (${needsCount})`} active={fNeeds} onClick={() => setFNeeds(!fNeeds)}/>
-            <Chip label="⚠ Needs MATH" active={fMath} onClick={() => setFMath(!fMath)}/>
-          </Row>
-          <Text size="small" tone="tertiary">
-            {listSlots.length} Slot{listSlots.length === 1 ? "" : "s"}
-          </Text>
-          <Stack gap={8}>
-            {(dayFilter === "All" ? [...DAYS] : [dayFilter]).map((day) => {
-                const daySlots = listSlots.filter((s) => s.day === day);
-                if (daySlots.length === 0)
-                    return null;
-                return (<div key={day}>
-                  <Stack gap={5}>
-                    <Text size="small" weight="semibold" style={{ color: P.ink600 }}>
-                      {day}
-                    </Text>
-                    {daySlots.map((s) => (<div key={s.id}>
-                        <SlotListRow slot={s} applied={applied} origins={origins} targets={targets} phase={phase} skin={skin} mathStyle={mathStyle} onPick={pick}/>
-                      </div>))}
-                  </Stack>
-                </div>);
-            })}
-            {listSlots.length === 0 && (<Text size="small" tone="tertiary">
-                No Slots Match These Filters
-              </Text>)}
-          </Stack>
-        </Stack>)}
-
-    </Stack>);
-    if (useSidebar) {
-        return (<div style={{ display: "flex", alignItems: "stretch", width: "100%" }}>
-        <div style={{ flex: 1, minWidth: 0 }}>{grid}</div>
-        <SidebarConfirm {...stripProps}/>
+/** Collapsed facilitator line with a working "+N more" disclosure. */
+function Facilitators(props) {
+    const [open, setOpen] = useCanvasState("mvs_fac_open", []);
+    const isOpen = open.indexOf(props.slotId) >= 0;
+    const n = props.people.length;
+    if (n === 0)
+        return <div className="pick__meta">No one rostered yet</div>;
+    if (isOpen) {
+        return (<div className="pick__meta">
+        <ul className="faclist">
+          {props.people.map((p, i) => (<li key={i}>
+              <span>{p.name}</span>
+              <span className="faclist__disc">{DISC_LABEL[p.disc]}</span>
+            </li>))}
+        </ul>
+        <button type="button" className="btn btn--link" onClick={() => setOpen(open.filter((x) => x !== props.slotId))}>
+          Show less
+        </button>
       </div>);
     }
-    return (<div style={{ display: "flex", flexDirection: "column", width: "100%" }}>
-      <div>{grid}</div>
-      {showTray && (<div style={{ position: "sticky", bottom: 0, zIndex: 5 }}>
-          <MatchStrip {...stripProps}/>
-        </div>)}
+    const shown = props.people.slice(0, 2).map((p) => p.name).join(", ");
+    const rest = n - Math.min(n, 2);
+    return (<div className="pick__meta">
+      {shown}
+      {rest > 0 ? (<>
+          {" "}
+          <button type="button" className="btn btn--link" onClick={() => setOpen(open.concat([props.slotId]))}>
+            +{rest} more
+          </button>
+        </>) : null}
     </div>);
 }
-/* ---------- Galleries ---------- */
-function TestDesigns(props) {
-    const { skin, mathStyle, onSkin, onMath } = props;
-    const samples = [
-        { label: "Needs", count: 2, kind: "needs" },
-        { label: "Available", count: 5, kind: "available" },
-        { label: "Covered", count: 8, kind: "covered" },
-        { label: "Full", count: 10, kind: "full" },
-        { label: "Your Shift", count: 6, kind: "yours" },
-        { label: "Leaving", count: 6, kind: "leaving" },
-        { label: "Joining", count: 3, kind: "selected" },
-    ];
-    return (<Stack gap={16} style={{ padding: 16 }}>
-      <Stack gap={4}>
-        <div style={{ fontSize: 18, fontWeight: 600, color: P.ink900 }}>Design Lab</div>
-        <Text size="small" tone="secondary">
-          Side-by-side cell states for the selected theme. Pick a skin or MATH badge below — the same
-          choice drives the live Move / Assign timetable when you leave this lab.
-        </Text>
-      </Stack>
-
-      {SKIN_GROUPS.map((group) => (<div key={group.title}>
-          <Stack gap={6}>
-            <Text size="small" weight="semibold">
-              {group.title}
-            </Text>
-            <Row gap={8} wrap>
-              {group.skins.map((s) => (<span key={s}>
-                  <Chip label={SKIN_META[s].badge} active={skin === s} onClick={() => onSkin(s)}/>
-                </span>))}
-            </Row>
-          </Stack>
-        </div>))}
-
-      <Callout tone="neutral" title={SKIN_META[skin].badge}>
-        {SKIN_META[skin].pitch}
-      </Callout>
-
-      <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
-            gap: 10,
-        }}>
-        {samples.map((sample) => {
-            const band = sample.kind === "yours" || sample.kind === "leaving" || sample.kind === "selected"
-                ? "needs"
-                : sample.kind;
-            const f = {
-                band,
-                count: sample.count,
-                isMine: sample.kind === "yours",
-                isOrigin: sample.kind === "leaving",
-                isTarget: sample.kind === "selected",
-                originIndex: sample.kind === "leaving" ? 1 : 0,
-                targetIndex: sample.kind === "selected" ? 1 : 0,
-                gap: sample.kind === "needs" || sample.kind === "available",
-                phase: "joining",
-                canUndoLeave: sample.kind === "leaving",
-            };
-            const chrome = cellChrome(f, skin);
-            const railPad = skin === "B" || skin === "L" || skin === "F" || skin === "H";
-            return (<div key={sample.label}>
-              <Text size="small" tone="tertiary">
-                {sample.label}
-              </Text>
-              <div style={{
-                    position: "relative",
-                    marginTop: 4,
-                    minHeight: 64,
-                    padding: railPad ? "8px 8px 8px 12px" : 8,
-                    borderRadius: 6,
-                    border: chrome.border,
-                    background: chrome.bg,
-                    opacity: chrome.opacity,
-                }}>
-                <CellBody f={f} skin={skin} loc="gp" mathStyle={mathStyle}/>
-              </div>
-            </div>);
+function ConfirmSide(props) {
+    const matched = props.leave.length === props.join.length && props.leave.length > 0;
+    const remaining = props.leave.length - props.join.length;
+    return (<div className="side">
+      <div className="side__head">
+        <div className="side__title">{props.self ? "Your move" : "Move for " + props.who}</div>
+        <div className="side__match">
+          Leaving <b>{props.leave.length}</b>, joining <b>{props.join.length}</b>
+          {matched ? ", ready to confirm" : remaining > 0 ? ", pick " + remaining + " more" : ", remove " + -remaining}
+        </div>
+      </div>
+      <div className="side__body">
+        <div className="side__group">
+          <div className="side__label">Leaving</div>
+          {props.leave.map((id) => {
+            const s = byId(id);
+            if (!s)
+                return null;
+            return (<div key={id} className="pick pick--leave">
+                <div className="pick__main">
+                  <div className="pick__when">{fmtSlot(s)}</div>
+                  <div className="pick__meta">{CAMPUS[s.campus].name}</div>
+                </div>
+                {props.leave.length > 1 ? (<button type="button" className="pick__x" title="Keep this hour" onClick={() => props.onDropLeave(id)}>
+                    ×
+                  </button>) : (<Tip text="Keep at least one hour selected, or go back to step 1.">
+                    <span className="pick__x" style={{ opacity: 0.35 }}>
+                      ×
+                    </span>
+                  </Tip>)}
+              </div>);
         })}
-      </div>
-
-      <Divider />
-
-      <Stack gap={6}>
-        <Text size="small" weight="semibold">
-          MATH badge styles
-        </Text>
-        <Text size="small" tone="tertiary">
-          Independent of cell skin. Try each on a green or blue open cell above.
-        </Text>
-        <Row gap={8} wrap>
-          {ALL_MATH.map((m) => (<span key={m}>
-              <Chip label={MATH_META[m].badge} active={mathStyle === m} onClick={() => onMath(m)}/>
-            </span>))}
-        </Row>
-        <Callout tone="neutral" title={MATH_META[mathStyle].badge}>
-          {MATH_META[mathStyle].pitch}
-        </Callout>
-        <Row gap={10} wrap>
-          {["green", "blue", "neutral"].map((surf) => (<div key={surf} style={{
-                padding: 10,
-                borderRadius: 8,
-                background: surf === "green" ? P.greenFill : surf === "blue" ? P.blue50 : P.surface,
-                border: `1px solid ${P.line}`,
-            }}>
-              <MathNeededBadge surface={surf} style={mathStyle}/>
-            </div>))}
-        </Row>
-      </Stack>
-    </Stack>);
-}
-function ConfirmCompare() {
-    const [layout, setLayout] = useCanvasState("p6_cmp", "sidebar");
-    const origins = [slotById("mon-14"), slotById("mon-15")];
-    const targets = [slotById("wed-12"), slotById("wed-13")];
-    const noop = () => undefined;
-    const shared = {
-        origins,
-        targets,
-        phase: "joining",
-        onRemoveOrigin: noop,
-        onRemoveTarget: noop,
-        onFocusLeaving: noop,
-        onFocusJoining: noop,
-        onConfirm: noop,
-        onBack: noop,
-    };
-    return (<Stack gap={14} style={{ padding: 16 }}>
-      <Stack gap={4}>
-        <div style={{ fontSize: 18, fontWeight: 600, color: P.ink900 }}>Confirm Layout Lab</div>
-        <Text size="small" tone="secondary">
-          Compare sticky bottom tray vs right sidebar. Both stay available for supervisor feedback.
-        </Text>
-      </Stack>
-      <Row gap={8}>
-        <Chip label="Sticky Tray" active={layout === "tray"} onClick={() => setLayout("tray")}/>
-        <Chip label="Right Sidebar" active={layout === "sidebar"} onClick={() => setLayout("sidebar")}/>
-      </Row>
-      {layout === "tray" ? (<div style={{ border: `1px solid ${P.line}`, borderRadius: 8, overflow: "hidden" }}>
-          <div style={{
-                height: 140,
-                background: P.surface,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-            }}>
-            <Text size="small" tone="tertiary">Timetable Area</Text>
-          </div>
-          <MatchStrip {...shared}/>
-        </div>) : (<div style={{
-                display: "flex",
-                border: `1px solid ${P.line}`,
-                borderRadius: 8,
-                overflow: "hidden",
-                minHeight: 340,
-            }}>
-          <div style={{
-                flex: 1,
-                background: P.surface,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-            }}>
-            <Text size="small" tone="tertiary">Week Grid</Text>
-          </div>
-          <SidebarConfirm {...shared}/>
-        </div>)}
-    </Stack>);
-}
-function ActiveOverrides(props) {
-    const [rows, setRows] = useCanvasState("p6_rows", SEED_OVERRIDES);
-    const active = rows.filter((r) => r.status === "active");
-    return (<Stack gap={14} style={{ padding: 16 }}>
-      <Row gap={10} align="center" wrap>
-        <Stack gap={3} style={{ flex: 1 }}>
-          <div style={{ fontSize: 18, fontWeight: 600, color: P.ink900 }}>Active Overrides</div>
-          <Text size="small" tone="secondary">
-            Week 6 · {active.length} Active · Leave hours must match join hours
-          </Text>
-        </Stack>
-        <Btn variant="primary" onClick={props.onAssign}>
-          Assign Override
-        </Btn>
-      </Row>
-
-      {active.length === 0 ? (<div style={{
-                border: `1px dashed ${P.line}`,
-                borderRadius: 8,
-                padding: 20,
-                background: P.surface,
-                textAlign: "center",
-            }}>
-          <Stack gap={8}>
-            <Text weight="semibold">No Active Overrides</Text>
-            <Text size="small" tone="secondary">
-              Assign an override for a PLF when they cannot move their own shift.
-            </Text>
-            <div>
-              <Btn variant="primary" onClick={props.onAssign}>
-                Assign Override
-              </Btn>
-            </div>
-          </Stack>
-        </div>) : (<div style={{ border: `1px solid ${P.line}`, borderRadius: 8, overflow: "hidden" }}>
-          {active.map((r) => (<div key={r.id} style={{ padding: "12px 14px", borderBottom: `1px solid ${P.line}` }}>
-              <Row gap={10} align="center" wrap>
-                <Stack gap={2} style={{ minWidth: 110, flex: "0 1 140px" }}>
-                  <Text size="small" weight="semibold">
-                    {r.plf}
-                  </Text>
-                  <Text size="small" tone="tertiary">
-                    {r.by === "Self" ? "Self move" : "Assigned by SSP"} · {r.hours}h
-                  </Text>
-                </Stack>
-                <Stack gap={2} style={{ flex: "1 1 220px", minWidth: 180 }}>
-                  <Text size="small">
-                    <span style={{ color: "#C42A1E", fontWeight: 600 }}>Leave</span>
-                    <span style={{ color: P.ink400 }}> · </span>
-                    <span style={{ color: P.ink900 }}>{r.from}</span>
-                  </Text>
-                  <Text size="small">
-                    <span style={{ color: P.green, fontWeight: 600 }}>Join</span>
-                    <span style={{ color: P.ink400 }}> · </span>
-                    <span style={{ color: P.ink900 }}>{r.to}</span>
-                  </Text>
-                </Stack>
-                <span style={{
-                    fontSize: 10,
-                    fontWeight: 700,
-                    color: P.green,
-                    background: P.greenFill,
-                    border: `1px solid ${P.greenBorder}`,
-                    borderRadius: 999,
-                    padding: "2px 8px",
-                    flexShrink: 0,
-                }}>
-                  Active
-                </span>
-                <Spacer />
-                <Btn variant="danger" onClick={() => setRows(rows.map((x) => (x.id === r.id ? { ...x, status: "cancelled" } : x)))}>
-                  Cancel
-                </Btn>
-              </Row>
-            </div>))}
-        </div>)}
-
-      <Text size="small" tone="tertiary">
-        Cancel removes the override instantly. Assign Override opens the PLF picker + matched
-        leave/join flow on the primary MATH roster.
-      </Text>
-    </Stack>);
-}
-function AdminAssign(props) {
-    const [plf, setPlf] = useCanvasState("p6a_plf", PLF_OPTIONS[0]);
-    const [plfSearch, setPlfSearch] = useCanvasState("p6a_plf_q", PLF_OPTIONS[0]);
-    const [toast, setToast] = useCanvasState("p6a_toast", null);
-    const [, setRows] = useCanvasState("p6_rows", SEED_OVERRIDES);
-    const roster = PRIMARY_ROSTER;
-    const matches = PLF_OPTIONS.filter((p) => p.toLowerCase().includes(plfSearch.trim().toLowerCase()));
-    function pickPlf(name) {
-        setPlf(name);
-        setPlfSearch(name);
-    }
-    return (<Stack gap={0} style={{ flex: 1, minHeight: 0, height: "100%" }}>
-      <div style={{
-            padding: "6px 10px",
-            borderBottom: `1px solid ${P.line}`,
-            background: P.surface,
-            flexShrink: 0,
-        }}>
-        <Row gap={8} align="center" wrap>
-          <button type="button" onClick={props.onDone} style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 4,
-            fontSize: 12,
-            fontWeight: 600,
-            color: P.blue600,
-            background: P.white,
-            border: `1px solid ${P.blue200}`,
-            borderRadius: 6,
-            padding: "5px 10px",
-            cursor: "pointer",
-            flexShrink: 0,
-        }}>
-            ← Active
-          </button>
-          <div style={{ position: "relative", flex: "1 1 180px", minWidth: 140, maxWidth: 260 }}>
-            <input value={plfSearch} onChange={(e) => {
-            setPlfSearch(e.target.value);
-            const hit = PLF_OPTIONS.find((p) => p.toLowerCase() === e.target.value.trim().toLowerCase());
-            if (hit)
-                setPlf(hit);
-        }} placeholder="Search PLF…" style={{
-            width: "100%",
-            boxSizing: "border-box",
-            fontSize: 12,
-            fontWeight: 600,
-            padding: "5px 8px",
-            borderRadius: 6,
-            border: `1px solid ${P.line}`,
-            background: P.white,
-            color: P.ink900,
-        }}/>
-            {plfSearch.trim() &&
-            matches.length > 0 &&
-            !(matches.length === 1 && matches[0] === plf) && (<div style={{
-                position: "absolute",
-                top: "100%",
-                left: 0,
-                right: 0,
-                zIndex: 8,
-                marginTop: 2,
-                background: P.white,
-                border: `1px solid ${P.line}`,
-                borderRadius: 6,
-                boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-                maxHeight: 140,
-                overflowY: "auto",
-            }}>
-                  {matches.map((p) => (<button key={p} type="button" onClick={() => pickPlf(p)} style={{
-                    display: "block",
-                    width: "100%",
-                    textAlign: "left",
-                    padding: "6px 8px",
-                    border: "none",
-                    background: p === plf ? P.blue50 : P.white,
-                    fontSize: 12,
-                    color: P.ink900,
-                    cursor: "pointer",
-                }}>
-                      {p}
-                    </button>))}
-                </div>)}
-          </div>
-          <span title="Primary discipline roster (read-only)" style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 5,
-            background: P.blue50,
-            border: `1px solid ${P.blue200}`,
-            borderRadius: 6,
-            padding: "4px 8px",
-            fontSize: 12,
-            fontWeight: 600,
-            color: P.blue800,
-            flexShrink: 0,
-        }}>
-            <DiscIcon code={roster.code} size={12}/>
-            {roster.code} roster
-          </span>
-        </Row>
-      </div>
-      <TimetablePicker role="admin" narrow={props.narrow} confirmLayout={props.confirmLayout} skin={props.skin} mathStyle={props.mathStyle} adminPlf={plf} rosterLabel={roster.label} rosterCode={roster.code} onApplied={(info) => {
-            setToast(info.message);
-            if (info.hours > 0) {
-                setRows((prev) => [
-                    {
-                        id: Date.now(),
-                        plf,
-                        from: info.from,
-                        to: info.to,
-                        by: "SSP",
-                        hours: info.hours,
-                        status: "active",
-                    },
-                    ...prev,
-                ]);
-            }
-        }}/>
-      {toast && (<div style={{ padding: 10 }}>
-          <Row gap={8}>
-            <Text size="small">{toast}</Text>
-            <Spacer />
-            <Btn onClick={props.onDone}>View Active</Btn>
-          </Row>
-        </div>)}
-    </Stack>);
-}
-/* ---------- Shell ---------- */
-function AbsenceReallocationPhase1Prototype() {
-    const theme = hostTheme;
-    const [role, setRole] = useCanvasState("p6_role", "plf");
-    const [narrow, setNarrow] = useCanvasState("p6_narrow", false);
-    const [screen, setScreen] = useCanvasState("p6_screen2", "move");
-    const [confirmLayout, setConfirmLayout] = useCanvasState("p6_clayout", "sidebar");
-    const [skin, setSkin] = useCanvasState("p6_skin4", "C");
-    const [mathStyle, setMathStyle] = useCanvasState("p6_math", "rose");
-    const [toast, setToast] = useCanvasState("p6_toast", null);
-    const [, setStage] = useCanvasState("p6_stage", "choose");
-    const [, setOrigins] = useCanvasState("p6_origins", []);
-    const [, setTargets] = useCanvasState("p6_targets", []);
-    const [, setApplied] = useCanvasState("p6_applied", null);
-    function resetMock() {
-        setStage("choose");
-        setOrigins([]);
-        setTargets([]);
-        setApplied(null);
-        setToast(null);
-    }
-    const labScreen = screen === "skins" || screen === "confirms";
-    const designPanel = (<div style={{
-            width: 196,
-            flex: "0 0 196px",
-            flexShrink: 0,
-            border: `1px solid ${P.line}`,
-            borderRadius: 8,
-            background: P.white,
-            padding: 8,
-            alignSelf: "flex-start",
-            maxHeight: "calc(100dvh - 24px)",
-            overflowY: "auto",
-            position: "sticky",
-            top: 8,
-        }}>
-      <Stack gap={8}>
-        <Stack gap={2}>
-          <Text size="small" weight="semibold">
-            Design Variations
-          </Text>
-          <Text size="small" tone="tertiary">
-            Click a theme — live timetable updates instantly
-          </Text>
-        </Stack>
-
-        {SKIN_GROUPS.map((group) => (<div key={group.title}>
-            <Stack gap={4}>
-              <Text size="small" tone="tertiary">
-                {group.title}
-              </Text>
-              <Row gap={4} wrap>
-                {group.skins.map((s) => (<span key={s}>
-                    <Pill active={skin === s && !labScreen} onClick={() => {
-                    setSkin(s);
-                    if (labScreen)
-                        setScreen(role === "admin" ? "active" : "move");
-                }} size="sm">
-                      {SKIN_META[s].badge}
-                    </Pill>
-                  </span>))}
-              </Row>
-            </Stack>
-          </div>))}
-
-        <Stack gap={4}>
-          <Text size="small" tone="tertiary">
-            MATH badge (⚠)
-          </Text>
-          <Row gap={4} wrap>
-            {ALL_MATH.map((m) => (<span key={m}>
-                <Pill active={mathStyle === m && !labScreen} onClick={() => {
-                setMathStyle(m);
-                if (labScreen)
-                    setScreen(role === "admin" ? "active" : "move");
-            }} size="sm">
-                  {MATH_META[m].badge}
-                </Pill>
-              </span>))}
-          </Row>
-        </Stack>
-
-        <div style={{
-            background: P.surface,
-            border: `1px solid ${P.line}`,
-            borderRadius: 6,
-            padding: 8,
-        }}>
-          <Stack gap={4}>
-            <Text size="small" weight="semibold">
-              Active: {SKIN_META[skin].badge}
-            </Text>
-            <Text size="small" tone="secondary">
-              {SKIN_META[skin].pitch}
-            </Text>
-            <Text size="small" weight="semibold">
-              MATH: {MATH_META[mathStyle].badge}
-            </Text>
-            <Text size="small" tone="secondary">
-              {MATH_META[mathStyle].pitch}
-            </Text>
-          </Stack>
         </div>
 
-        <Row gap={4} wrap>
-          <span>
-            <Pill size="sm" active={screen === "skins"} onClick={() => setScreen("skins")}>
-              Design Lab
-            </Pill>
-          </span>
-          <span>
-            <Pill size="sm" active={screen === "confirms"} onClick={() => setScreen("confirms")}>
-              Confirm Lab
-            </Pill>
-          </span>
-        </Row>
-      </Stack>
+        <div className="side__group">
+          <div className="side__label">Joining</div>
+          {props.join.map((id) => {
+            const s = byId(id);
+            if (!s)
+                return null;
+            const isStale = props.stale.indexOf(id) >= 0;
+            const people = peopleOf(s, null);
+            return (<div key={id} className={"pick pick--join" + (isStale ? " pick--stale" : "")}>
+                <div className="pick__main">
+                  <div className="pick__when">{fmtSlot(s)}</div>
+                  <Facilitators people={people} slotId={id}/>
+                  {!hasDiscipline(s) ? (<div style={{ marginTop: 4 }}><NeedsBadge short /></div>) : null}
+                  {isStale ? <div className="pick__warn">This hour filled up. Pick another one.</div> : null}
+                </div>
+                <button type="button" className="pick__x" onClick={() => props.onDropJoin(id)}>
+                  ×
+                </button>
+              </div>);
+        })}
+
+          {/* One waiting slot per unmatched leave hour: the count to pick is visible, not stated. */}
+          {Array.from({ length: Math.max(0, props.leave.length - props.join.length) }, (_, i) => (<div key={"wait-" + i} className="waiting">
+              <span className="waiting__n">{props.join.length + i + 1}</span>
+              <span className="waiting__t">Choose an hour</span>
+            </div>))}
+
+          {props.leave.length > props.join.length ? (<div className="note note--quiet">
+              Pick {props.leave.length - props.join.length} more{" "}
+              {plural(props.leave.length - props.join.length, "hour", "hours")} from the timetable to
+              match what you are leaving.
+            </div>) : null}
+        </div>
+      </div>
+      <div className="side__foot">
+        <button type="button" className="btn btn--primary btn--block" disabled={!matched || props.stale.length > 0} onClick={props.onApply}>
+          {props.self ? "Confirm move" : "Apply move"}
+        </button>
+        <button type="button" className="btn btn--link" onClick={props.onBack}>
+          Back to step 1
+        </button>
+        <div className="pick__meta">
+          This applies straight away. No approval needed.
+        </div>
+      </div>
     </div>);
-    return (<Stack gap={8} style={{ padding: 12 }}>
-      <Stack gap={2}>
-        <H1>Absence Reallocation - Phase 1</H1>
-        <Text tone="secondary" size="small">
-          Interactive prototype: choose leave hours, then match the same number of joins.
-        </Text>
-      </Stack>
+}
+/* ---------------------------------------------------------------- move screen */
+/** Type-ahead PLF picker. A roster has hundreds of PLFs; a row of chips does not scale. */
+function PlfSearch(props) {
+    const [q, setQ] = useCanvasState("mvs_plfq", "");
+    const [open, setOpen] = useCanvasState("mvs_plfopen", false);
+    const matches = PLF_OPTIONS.filter((n) => n.toLowerCase().indexOf(q.toLowerCase()) >= 0);
+    return (<div className="card plfpick">
+      <div className="card__body plfpick__body">
+        <div className="plfpick__field">
+          <label className="side__label" htmlFor="plf-search">
+            PLF
+          </label>
+          <div className="plfpick__inputwrap">
+            <input id="plf-search" className="search" placeholder="Search by name or student number" value={open ? q : props.who} onFocus={() => {
+            setOpen(true);
+            setQ("");
+        }} onChange={(e) => setQ(e.target.value)}/>
+            {open ? (<div className="plfpick__menu">
+                {matches.length === 0 ? (<div className="plfpick__none">No PLF matches that search.</div>) : (matches.map((n) => (<button key={n} type="button" className="plfpick__opt" onClick={() => {
+                    props.onPick(n);
+                    setOpen(false);
+                    setQ("");
+                }}>
+                      {n}
+                      {n === props.who ? <span className="plfpick__cur">current</span> : null}
+                    </button>)))}
+              </div>) : null}
+          </div>
+        </div>
+        <Tip text="Phase 1 moves stay on the PLF's own discipline roster.">
+          <span className="pill pill--active plfpick__disc">{DISCIPLINE.full}</span>
+        </Tip>
+      </div>
+    </div>);
+}
+function MoveFlow(props) {
+    const keyp = props.self ? "mvs_p_" : "mvs_a_";
+    const [stage, setStage] = useCanvasState(keyp + "stage", "choose");
+    const [leave, setLeave] = useCanvasState(keyp + "leave", []);
+    const [join, setJoin] = useCanvasState(keyp + "join", []);
+    const [applied, setApplied] = useCanvasState(keyp + "applied", null);
+    const [view, setView] = useCanvasState(keyp + "view", "week");
+    const [openOnly, setOpenOnly] = useCanvasState(keyp + "fopen", false);
+    const [needsOnly, setNeedsOnly] = useCanvasState(keyp + "fneeds", false);
+    const [day, setDay] = useCanvasState(keyp + "fday", "All");
+    const [query, setQuery] = useCanvasState(keyp + "fq", "");
+    const canExceed = props.role !== "plf";
+    function st(s) {
+        return stateOf(s, { caps: props.caps, applied, leave, join, stage, role: props.role, canExceed });
+    }
+    // A join target that filled up between load and confirm. Mocked as always empty here,
+    // but the shape is real: commit 4 needs to handle slot_full mid-flight.
+    const stale = [];
+    function toggleLeave(id) {
+        setLeave(leave.indexOf(id) >= 0 ? leave.filter((x) => x !== id) : leave.concat([id]));
+    }
+    function toggleJoin(id) {
+        if (join.indexOf(id) >= 0) {
+            setJoin(join.filter((x) => x !== id));
+            return;
+        }
+        if (join.length >= leave.length)
+            return;
+        setJoin(join.concat([id]));
+    }
+    /**
+     * One click handler for the whole grid. Your own hours toggle as leave (so more can be
+     * added without going back a step); everything else toggles as a join target.
+     */
+    function pick(id) {
+        if (MY_SHIFTS.indexOf(id) >= 0) {
+            if (leave.indexOf(id) >= 0) {
+                dropLeave(id);
+            }
+            else {
+                setLeave(leave.concat([id]));
+            }
+            return;
+        }
+        toggleJoin(id);
+    }
+    function dropLeave(id) {
+        if (leave.length <= 1)
+            return;
+        const next = leave.filter((x) => x !== id);
+        setLeave(next);
+        if (join.length > next.length)
+            setJoin(join.slice(0, next.length));
+    }
+    function reset() {
+        setStage("choose");
+        setLeave([]);
+        setJoin([]);
+    }
+    const mine = SLOTS.filter((s) => MY_SHIFTS.indexOf(s.id) >= 0 && (!applied || applied.leave.indexOf(s.id) < 0));
+    /* ---- step 1 ---- */
+    if (stage === "choose") {
+        const allMine = SLOTS.filter((s) => MY_SHIFTS.indexOf(s.id) >= 0);
+        const noRoster = allMine.length === 0;
+        return (<div className="page page--step1">
+        <div className="flow">
+        <div className="pg__head">
+          <h1 className="pg__title">{props.self ? "Move a Shift" : "Move a Shift for a PLF"}</h1>
+          <p className="pg__sub">
+            {props.self
+                ? "Move hours you cannot make to other hours in the same week. Your total hours stay the same."
+                : "Move hours for a PLF on their discipline roster. Their total hours stay the same."}
+          </p>
+        </div>
 
-      <Callout tone="info" title="How to use this prototype (for review)">
-        1. Controls: Role (PLF / SSP), Viewport, Confirm UI. 2. Design Variations (right): click a
-        skin or MATH badge — the live grid updates; read the Active pitch under the pills. 3. SSP:
-        Active Overrides → Assign Override → search PLF → matched leave/join → Apply. Cancel
-        removes an override. 4. On Join confirm, click +N more to expand facilitator names. 5.
-        Mobile: list browse with search, day chips, Open Slots, ⚠ Needs MATH.
-      </Callout>
+        <Steps stage="choose"/>
 
-      <div style={{
-            border: `1px solid ${P.line}`,
-            borderRadius: 8,
-            background: P.surface,
-            padding: "8px 10px",
-        }}>
-        <Stack gap={10}>
-          <Row gap={8} align="center" wrap>
-            <Text size="small" weight="semibold">
-              Prototype Controls
-            </Text>
-            <Spacer />
-            <span>
-              <Pill size="sm" onClick={resetMock}>
-                Reset Demo
-              </Pill>
-            </span>
-          </Row>
-          <Row gap={8} align="center" wrap>
-            <Text size="small" tone="tertiary">
-              Role
-            </Text>
-            <span>
-              <Pill active={role === "plf"} onClick={() => {
+        <div className="step1panel">
+        {!props.self ? (<div className="step1panel__who">
+          <PlfSearch who={props.who} onPick={(n) => props.onPickWho && props.onPickWho(n)}/>
+        </div>) : null}
+
+        {mine.length === 0 ? (
+            <div className="empty">
+              <div className="empty__t">
+                {noRoster ? "No rostered hours this week" : "No hours available to move this week"}
+              </div>
+              <div className="empty__s">
+                {noRoster
+                    ? "Add your availabilities so the team can roster you. Once hours are assigned, you can move them here."
+                    : "Every rostered hour is already moved or marked absent this week."}
+              </div>
+              {noRoster && props.self ? (<button type="button" className="btn btn--primary" style={{ marginTop: 4 }}>
+                  Add availabilities
+                </button>) : null}
+            </div>
+          ) : (<>
+            {!props.self ? (<div className="step1panel__hint">Select the hours {props.who} should leave</div>) : null}
+            <div className="list">
+              {mine.map((s) => {
+                    // Step 1 is a plain pick list: which hours, nothing else.
+                    // Staffing detail belongs to step 2, where you are choosing where to go.
+                    const on = leave.indexOf(s.id) >= 0;
+                    return (<button key={s.id} type="button" className={"pickrow" + (on ? " pickrow--on" : "")} onClick={() => toggleLeave(s.id)}>
+                    <span className={"pickrow__box" + (on ? " pickrow__box--on" : "")}>
+                      {on ? <Check /> : null}
+                    </span>
+                    <span className="pickrow__main">
+                      <span className="pickrow__when">
+                        {s.day} {s.start}
+                      </span>
+                      <span className="pickrow__where">{CAMPUS[s.campus].name}</span>
+                    </span>
+                  </button>);
+                })}
+            </div>
+            <div className="step1panel__foot">
+              <span className="pickrow__where">
+                {leave.length} of {mine.length} selected
+              </span>
+              <button type="button" className="btn btn--primary" disabled={leave.length === 0} onClick={() => setStage("join")}>
+                Continue
+              </button>
+            </div>
+          </>)}
+        </div>
+        {props.self ? (<p className="pickrow__where step1__abs">
+              Cannot make it at all?{" "}
+              <button type="button" className="btn btn--link">
+                Report an absence
+              </button>{" "}
+              instead.
+            </p>) : null}
+        </div>
+      </div>);
+    }
+    /* ---- step 2 and 3 ---- */
+    const visible = SLOTS.filter((s) => {
+        const state = st(s);
+        // Your own hours and anything already picked always stay on screen: a filter must never
+        // hide a selection or the hours you are allowed to add as leave.
+        const pinned = state.mine || state.leaving || state.joining;
+        if (openOnly && state.band !== "needs" && !pinned)
+            return false;
+        if (needsOnly && hasDiscipline(s) && !pinned)
+            return false;
+        if (day !== "All" && s.day !== day && !pinned)
+            return false;
+        if (query) {
+            const hay = (s.day + " " + s.start + " " + CAMPUS[s.campus].name + " " + s.people.map((p) => p.name).join(" ")).toLowerCase();
+            if (hay.indexOf(query.toLowerCase()) < 0)
+                return false;
+        }
+        return true;
+    });
+    const grid = {};
+    visible.forEach((s) => {
+        grid[s.day + "-" + s.timeKey] = s;
+    });
+    return (<div className="page">
+      <div className="pg__head pg__head--row">
+        <button type="button" className="btn btn--back" onClick={() => setStage("choose")}>
+          <BackArrow /> Back
+        </button>
+        <div>
+          <h1 className="pg__title">{props.self ? "Move a Shift" : "Move a Shift for " + props.who}</h1>
+          <p className="pg__sub">
+            Choose {leave.length} {plural(leave.length, "hour", "hours")} to join. Full hours are closed.
+          </p>
+        </div>
+      </div>
+
+      <Steps stage="join"/>
+
+      <Filters view={view} onView={setView} openOnly={openOnly} needsOnly={needsOnly} day={day} query={query} onOpen={() => setOpenOnly(!openOnly)} onNeeds={() => setNeedsOnly(!needsOnly)} onDay={setDay} onQuery={setQuery} onClear={() => {
+            setOpenOnly(false);
+            setNeedsOnly(false);
+            setDay("All");
+            setQuery("");
+        }}/>
+
+      <div className="work">
+        <div className="work__main">
+          {visible.length === 0 ? (<div className="card">
+              <div className="empty">
+                <div className="empty__t">No hours match these filters</div>
+                <div className="empty__s">Clear a filter to see more of the week.</div>
+              </div>
+            </div>) : null}
+
+          {view === "week" ? (<div className="gridwrap">
+              <table className="grid">
+                <thead>
+                  <tr>
+                    <th className="grid__timehead">Time</th>
+                    {DAYS.map((d) => (<th key={d}>{d}</th>))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {TIMES.map((t) => (<tr key={t.key}>
+                      <td className="grid__time">{t.label}</td>
+                      {DAYS.map((d) => {
+                    const s = grid[d + "-" + t.key];
+                    return (<td key={d}>
+                            {s ? (<SlotCell st={st(s)} showExact={props.showExact} onPick={pick} onDrop={dropLeave}/>) : (
+                        // Filtered out or no session: a quiet gap, nothing to read.
+                        <span className="cell cell--empty"/>)}
+                          </td>);
+                })}
+                    </tr>))}
+                </tbody>
+              </table>
+            </div>) : null}
+
+          <div className={view === "week" ? "only-narrow" : ""}>
+            <div className="list" style={{ marginTop: view === "week" ? 0 : 0 }}>
+              {visible.map((s) => (<SlotRow key={s.id} st={st(s)} showExact={props.showExact} onPick={pick} onDrop={dropLeave}/>))}
+            </div>
+          </div>
+        </div>
+
+        <div className="work__side">
+          <ConfirmSide who={props.who} self={props.self} leave={leave} join={join} caps={props.caps} canExceed={canExceed} stale={stale} onDropLeave={dropLeave} onDropJoin={(id) => setJoin(join.filter((x) => x !== id))} onApply={() => {
+            setApplied({ leave: leave, join: join });
+            props.onApplied(leave, join);
+            reset();
+        }} onBack={() => setStage("choose")}/>
+        </div>
+      </div>
+    </div>);
+}
+/* ---------------------------------------------------------------- SSP screens */
+function ActiveMoves(props) {
+    return (<div className="page page--narrow">
+      <div className="pg__head">
+        <h1 className="pg__title">Active Shift Moves</h1>
+        <p className="pg__sub">
+          Temporary moves for this week. Cancelling a move puts every hour in it back where it started.
+        </p>
+      </div>
+
+      {props.moves.length === 0 ? (<div className="card">
+          <div className="empty">
+            <div className="empty__t">No active moves this week</div>
+            <div className="empty__s">When a PLF moves their hours, or you move hours for them, the move appears here.</div>
+            <button type="button" className="btn btn--primary" onClick={props.onAssign}>
+              Move a shift for a PLF
+            </button>
+          </div>
+        </div>) : (<>
+          <div style={{ marginBottom: 12 }}>
+            <button type="button" className="btn btn--primary" onClick={props.onAssign}>
+              Move a shift for a PLF
+            </button>
+          </div>
+          <div className="card card--table">
+            <div className="tblwrap">
+            <table className="tbl">
+              <colgroup>
+                <col className="c-plf"/>
+                <col className="c-leave"/>
+                <col className="c-join"/>
+                <col className="c-hrs"/>
+                <col className="c-by"/>
+                <col className="c-act"/>
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>PLF</th>
+                  <th>
+                    <span className="colhead colhead--leave">Leaving</span>
+                  </th>
+                  <th>
+                    <span className="colhead colhead--join">Joining</span>
+                  </th>
+                  <th>Hours</th>
+                  <th>Arranged by</th>
+                  <th className="tbl__act">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {props.moves.map((m) => (<tr key={m.id}>
+                    <td>
+                      <div className="tbl__plf">{m.plf}</div>
+                    </td>
+                    <td>
+                      {m.leave.map((x, i) => (<div key={i} className="mv mv--leave">
+                          {x}
+                        </div>))}
+                    </td>
+                    <td>
+                      {m.join.map((x, i) => (<div key={i} className="mv mv--join">
+                          {x}
+                        </div>))}
+                    </td>
+                    <td className="tbl__hrs">
+                      {Math.max(m.leave.length, m.join.length)}{" "}
+                      {plural(Math.max(m.leave.length, m.join.length), "hour", "hours")}
+                    </td>
+                    <td>{m.by}</td>
+                    <td className="tbl__act">
+                      <div className="tbl__act-inner">
+                      {m.overflowReason ? (<span className="pill pill--over" title={m.overflowReason}>
+                          Over capacity
+                        </span>) : null}
+                      <span className="pill pill--active">
+                        Active
+                      </span>
+                      <Tip text={"Cancels all " +
+                    m.leave.length +
+                    " leaving and " +
+                    m.join.length +
+                    " joining " +
+                    plural(m.join.length, "hour", "hours") +
+                    ". Moves cannot be cancelled in part."}>
+                        <button type="button" className="btn btn--danger btn--compact" onClick={() => props.onCancel(m.id)}>
+                          Cancel move
+                        </button>
+                      </Tip>
+                      </div>
+                    </td>
+                  </tr>))}
+              </tbody>
+            </table>
+            </div>
+          </div>
+        </>)}
+    </div>);
+}
+function CapTile(props) {
+    return (<div className="captile">
+      <div className="captile__name">{props.name}</div>
+      <div className="captile__hint">{props.hint}</div>
+      <div className="captile__row">
+        <input className="num" type="number" min={1} value={props.value} onChange={(e) => props.onChange(Math.max(1, parseInt(e.target.value || "1", 10)))}/>
+        <span className="captile__unit">per hour</span>
+      </div>
+      <Pips count={props.value} max={props.value}/>
+    </div>);
+}
+function Switch(props) {
+    return (<button type="button" className={"sw" + (props.on ? " sw--on" : "")} disabled={props.locked} onClick={props.onClick} aria-pressed={props.on}>
+      <span className="sw__dot"/>
+    </button>);
+}
+function Rule(props) {
+    // Control sits beside its label, not flung to the far edge of the page.
+    return (<div className="rule">
+      <Switch on={props.on} locked={props.locked} onClick={props.onToggle}/>
+      <div className="rule__main">
+        <div className="rule__label">{props.label}</div>
+        <div className="rule__hint">{props.hint}</div>
+      </div>
+      {props.preview ? props.preview : null}
+      {props.locked ? <span className="rule__fixed">Fixed</span> : null}
+    </div>);
+}
+function Settings(props) {
+    return (<div className="settings">
+      <div className="pg__head">
+        <h1 className="pg__title">Move a Shift Settings</h1>
+        <p className="pg__sub">Administrators only. SSPs can move shifts but cannot change these.</p>
+      </div>
+
+      <div className="sec">
+        <div className="sec__head">
+          <span className="sec__title">Capacity per campus</span>
+          <span className="sec__note">PLFs cannot move into a full hour.</span>
+        </div>
+        <div className="captiles">
+          <CapTile name="Gardens Point" hint="All GP rooms" value={props.caps.gp} onChange={(n) => props.onCaps({ gp: n, kg: props.caps.kg, online: props.caps.online })}/>
+          <CapTile name="Kelvin Grove" hint="Smaller rooms" value={props.caps.kg} onChange={(n) => props.onCaps({ gp: props.caps.gp, kg: n, online: props.caps.online })}/>
+          <CapTile name="Online" hint="Not room limited" value={props.caps.online} onChange={(n) => props.onCaps({ gp: props.caps.gp, kg: props.caps.kg, online: n })}/>
+        </div>
+      </div>
+
+      <div className="sec">
+        <div className="sec__head">
+          <span className="sec__title">Rules</span>
+        </div>
+        <div className="rules">
+          <Rule label="Show exact numbers to PLFs on full hours" hint="SSPs and admins always see the count. This only changes the PLF view." on={props.showExact} onToggle={() => props.onShowExact(!props.showExact)} preview={<span className="rule__prev">
+                <span className="rule__prevlabel">A PLF sees</span>
+                <span className="rule__prevcell">
+                  <span style={{ fontWeight: 650 }}>Full</span>
+                  {props.showExact ? <span className="cell__hint">13 of 3 · 10 over</span> : null}
+                </span>
+              </span>}/>
+          <Rule label="SSPs and admins may exceed capacity" hint="Warns, then asks for an optional reason." on locked/>
+        </div>
+      </div>
+
+      <div className="note note--warn">
+        Some hours were rostered above these limits before capacity existed. They keep their people and
+        show as over capacity. Nobody is removed automatically.
+      </div>
+    </div>);
+}
+function ReportAbsenceStub(props) {
+    return (<div>
+      <div className="pg__head">
+        <h1 className="pg__title">Report an Absence</h1>
+        <p className="pg__sub">Existing flow, unchanged in Phase 1. Shown here only to place Move a Shift beside it.</p>
+      </div>
+      <div className="card">
+        <div className="card__body">
+          <div className="note">
+            Reporting an absence tells the team you will not be there and leaves the hour empty. If you can still work,
+            but at a different time, <button type="button" className="btn btn--link" onClick={props.onMove}>move the shift</button>{" "}
+            instead so the hour stays covered. Hours you have joined through a move cannot be marked absent until an SSP reverses the move.
+          </div>
+        </div>
+      </div>
+    </div>);
+}
+/* ---------------------------------------------------------------- shell */
+function AbsenceReallocationPhase1Prototype() {
+    const [role, setRole] = useCanvasState("mvs_role", "plf");
+    const [screen, setScreen] = useCanvasState("mvs_screen", "move");
+    const [caps, setCaps] = useCanvasState("mvs_caps", DEFAULT_CAPS);
+    const [showExact, setShowExact] = useCanvasState("mvs_exact", false);
+    const [moves, setMoves] = useCanvasState("mvs_moves", SEED_MOVES);
+    const [who, setWho] = useCanvasState("mvs_who", PLF_OPTIONS[0]);
+    const [toast, setToast] = useCanvasState("mvs_toast", null);
+    const isPlf = role === "plf";
+    const exactFor = isPlf ? showExact : true;
+    const nav = isPlf
+        ? [
+            { id: "move", label: "Move a Shift" },
+            { id: "absence", label: "Report an Absence" },
+        ]
+        : role === "ssp"
+            ? [
+                { id: "active", label: "Active Shift Moves" },
+                { id: "assign", label: "Move a Shift for a PLF" },
+            ]
+            : [
+                { id: "active", label: "Active Shift Moves" },
+                { id: "assign", label: "Move a Shift for a PLF" },
+                { id: "settings", label: "Move a Shift Settings" },
+            ];
+    const allowed = nav.map((n) => n.id);
+    const current = allowed.indexOf(screen) >= 0 ? screen : nav[0].id;
+    function applyMove(plf, leave, join, by) {
+        const next = {
+            id: Date.now(),
+            plf,
+            leave: leave.map((id) => {
+                const s = byId(id);
+                return s ? fmtSlot(s) : id;
+            }),
+            join: join.map((id) => {
+                const s = byId(id);
+                return s ? fmtSlot(s) : id;
+            }),
+            by,
+            status: "active",
+        };
+        setMoves([next].concat(moves));
+        setToast("Move applied. " +
+            leave.length +
+            " " +
+            plural(leave.length, "hour", "hours") +
+            " moved.");
+    }
+    return (<div className="mvs">
+      <style>{CSS}</style>
+
+      <div className="mvs__bar">
+        <span className="mvs__brand">Student Success, STEM Support</span>
+        <span className="mvs__spacer"/>
+        <span className="mvs__demo">
+          <span>Preview as</span>
+          <button type="button" data-on={role === "plf" ? "1" : "0"} onClick={() => {
             setRole("plf");
             setScreen("move");
         }}>
-                PLF
-              </Pill>
-            </span>
-            <span>
-              <Pill active={role === "admin"} onClick={() => {
+            PLF
+          </button>
+          <button type="button" data-on={role === "ssp" ? "1" : "0"} onClick={() => {
+            setRole("ssp");
+            setScreen("active");
+        }}>
+            SSP
+          </button>
+          <button type="button" data-on={role === "admin" ? "1" : "0"} onClick={() => {
             setRole("admin");
             setScreen("active");
         }}>
-                SSP
-              </Pill>
-            </span>
-            <span style={{ width: 6 }}/>
-            <Text size="small" tone="tertiary">
-              Viewport
-            </Text>
-            <span>
-              <Pill active={!narrow} onClick={() => setNarrow(false)}>
-                Desktop
-              </Pill>
-            </span>
-            <span>
-              <Pill active={narrow} onClick={() => setNarrow(true)}>
-                Mobile
-              </Pill>
-            </span>
-            <span style={{ width: 6 }}/>
-            <Text size="small" tone="tertiary">
-              Confirm UI
-            </Text>
-            <span>
-              <Pill active={confirmLayout === "tray"} onClick={() => setConfirmLayout("tray")}>
-                Sticky Tray
-              </Pill>
-            </span>
-            <span>
-              <Pill active={confirmLayout === "sidebar"} onClick={() => setConfirmLayout("sidebar")}>
-                Right Sidebar
-              </Pill>
-            </span>
-          </Row>
-        </Stack>
+            Admin
+          </button>
+        </span>
+        <span className="mvs__who">Jack A</span>
       </div>
 
-      <div style={{
-            display: "flex",
-            flexDirection: "row",
-            alignItems: "flex-start",
-            gap: 10,
-            width: "100%",
-            minWidth: 0,
-        }}>
-        <div style={{
-            flex: narrow ? "0 0 420px" : "1 1 0%",
-            minWidth: narrow ? 420 : 0,
-            width: narrow ? 420 : undefined,
-            maxWidth: narrow ? 420 : undefined,
-        }}>
-          <Stack gap={8} style={{ width: "100%" }}>
-          {role === "admin" && !labScreen && (<Row gap={8}>
-              <Chip label="Active Overrides" active={screen === "active"} onClick={() => setScreen("active")}/>
-              <Chip label="Assign Override" active={screen === "move"} onClick={() => setScreen("move")}/>
-            </Row>)}
-
-          <div style={{
-            border: `1px solid ${theme.stroke.secondary}`,
-            borderRadius: 8,
-            overflow: "hidden",
-            background: P.white,
-            width: "100%",
-        }}>
-            <div style={{
-            background: P.blue800,
-            color: P.white,
-            padding: "6px 12px",
-            display: "flex",
-            alignItems: "center",
-            flexShrink: 0,
-        }}>
-              <Text size="small" weight="semibold" style={{ color: P.white }}>
-                Student Success - STEM Support
-              </Text>
-              <Spacer />
-              <Text size="small" style={{ color: "rgba(255,255,255,0.85)" }}>
-                Jack A · {role === "plf" ? "PLF" : "SSP"}
-              </Text>
-            </div>
-
-            <div style={{ display: "flex" }}>
-              {!narrow && !labScreen && (<div style={{ width: 168, flexShrink: 0, background: P.sidebar, padding: "10px 0" }}>
-                  <div style={{
-                padding: "4px 14px 8px",
-                fontSize: 10,
-                fontWeight: 600,
-                color: P.sidebarText,
-                letterSpacing: 0.4,
-            }}>
-                    {role === "plf" ? "ATTENDANCE" : "ROSTER"}
-                  </div>
-                  {(role === "plf"
-                ? ["Move A Shift", "Report Absence"]
-                : ["Active Overrides", "Assign Override"]).map((item) => {
-                const on = (role === "plf" && item === "Move A Shift") ||
-                    (role === "admin" &&
-                        ((screen === "active" && item === "Active Overrides") ||
-                            (screen === "move" && item === "Assign Override")));
-                return (<div key={item} onClick={() => {
-                        if (role === "admin") {
-                            setScreen(item === "Active Overrides" ? "active" : "move");
-                        }
-                    }} style={{
-                        padding: "7px 14px",
-                        fontSize: 12,
-                        color: on ? P.white : P.sidebarText,
-                        background: on ? "rgba(28,131,198,0.25)" : "transparent",
-                        borderLeft: on
-                            ? `3px solid ${P.sidebarActive}`
-                            : "3px solid transparent",
-                        cursor: role === "admin" ? "pointer" : "default",
-                    }}>
-                        {item}
-                      </div>);
-            })}
-                </div>)}
-
-              <div style={{ flex: 1, minWidth: 0, background: P.white }}>
-                {screen === "skins" ? (<TestDesigns skin={skin} mathStyle={mathStyle} onSkin={setSkin} onMath={setMathStyle}/>) : screen === "confirms" ? (<ConfirmCompare />) : role === "plf" ? (<TimetablePicker role="plf" narrow={narrow} confirmLayout={confirmLayout} skin={skin} mathStyle={mathStyle} onApplied={(info) => setToast(info.message)}/>) : screen === "active" ? (<ActiveOverrides onAssign={() => setScreen("move")}/>) : (<AdminAssign narrow={narrow} confirmLayout={confirmLayout} skin={skin} mathStyle={mathStyle} onDone={() => setScreen("active")}/>)}
-              </div>
-            </div>
-          </div>
-
-          {toast && (<div style={{
-                background: P.ink900,
-                color: P.white,
-                borderRadius: 8,
-                padding: "9px 12px",
-                fontSize: 12,
-                maxWidth: narrow ? 420 : undefined,
-            }}>
-              <Row gap={8}>
-                <span>{toast}</span>
-                <Spacer />
-                <span onClick={() => setToast(null)} style={{ cursor: "pointer", opacity: 0.7 }}>
-                  ×
-                </span>
-              </Row>
-            </div>)}
-          </Stack>
-        </div>
-
-        {designPanel}
+      <div className="mvs__tabs">
+        {nav.map((n) => (<button key={n.id} type="button" className="chip" data-on={current === n.id ? "1" : "0"} onClick={() => setScreen(n.id)}>
+            {n.label}
+          </button>))}
       </div>
-    </Stack>);
+
+      <div className="mvs__body">
+        <nav className="mvs__nav">
+          <div className="mvs__navhead">{isPlf ? "MY ROSTER" : "ROSTER"}</div>
+          {nav.map((n) => (<button key={n.id} type="button" className="mvs__navitem" data-on={current === n.id ? "1" : "0"} onClick={() => setScreen(n.id)}>
+              {n.label}
+            </button>))}
+        </nav>
+
+        <main className="mvs__main">
+          {current === "move" ? (<MoveFlow self who="You" role={role} caps={caps} showExact={exactFor} onApplied={(leave, join) => applyMove("You", leave, join, "Self")}/>) : current === "absence" ? (<ReportAbsenceStub onMove={() => setScreen("move")}/>) : current === "assign" ? (<MoveFlow self={false} who={who} role={role} caps={caps} showExact onPickWho={setWho} onApplied={(leave, join) => {
+                applyMove(who, leave, join, role === "admin" ? "Jack A (Admin)" : "Jack A (SSP)");
+                setScreen("active");
+            }}/>) : current === "settings" ? (<Settings caps={caps} onCaps={setCaps} showExact={showExact} onShowExact={setShowExact}/>) : (<ActiveMoves moves={moves} onAssign={() => setScreen("assign")} onCancel={(id) => {
+                setMoves(moves.filter((m) => m.id !== id));
+                setToast("Move cancelled. Every hour in it is back where it started.");
+            }}/>)}
+        </main>
+      </div>
+
+      {toast ? (<div className="toast">
+          <span>{toast}</span>
+          <button type="button" onClick={() => setToast(null)}>
+            ×
+          </button>
+        </div>) : null}
+    </div>);
 }
 
 

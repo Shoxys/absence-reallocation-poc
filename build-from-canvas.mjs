@@ -14,7 +14,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const CANVAS =
   process.env.CANVAS_SRC ||
-  "C:/Users/jacka/.cursor/projects/c-Downloads-Stimulate-stimulate-stimulate/canvases/absence-reallocation-phase1-prototype.canvas.tsx";
+  "C:/Users/jacka/.cursor/projects/c-Downloads-Stimulate-stimulate/canvases/absence-reallocation-phase1-prototype.canvas.tsx";
 
 const outPath = path.join(__dirname, "index.html");
 
