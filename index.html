@@ -255,7 +255,7 @@ const CSS = `
   --amber-fill: #FFF7ED;
   --amber-line: #F5C89A;
 
-  --cell-h: 72px;
+  --cell-h: 52px;
 
   display: flex;
   flex-direction: column;
@@ -276,7 +276,7 @@ const CSS = `
   align-items: center;
   gap: 12px;
   padding: 0 16px;
-  height: 46px;
+  height: 40px;
   background: var(--blue-800);
   color: var(--white);
 }
@@ -298,7 +298,7 @@ const CSS = `
 
 .mvs__body { flex: 1 1 auto; display: flex; min-height: 0; }
 .mvs__nav {
-  flex: 0 0 196px; width: 196px;
+  flex: 0 0 168px; width: 168px;
   background: var(--blue-900);
   padding: 12px 0;
   overflow-y: auto;
@@ -317,7 +317,7 @@ const CSS = `
 .mvs__navitem[data-on="1"] {
   color: var(--white); background: rgba(31,111,191,.34); border-left-color: var(--blue-400); font-weight: 600;
 }
-.mvs__main { flex: 1 1 auto; min-width: 0; overflow-y: auto; padding: 14px 18px 22px; }
+.mvs__main { flex: 1 1 auto; min-width: 0; overflow-y: auto; padding: 10px 14px 12px; }
 /* The timetable fills the viewport: it is the one screen that earns the width.
    Only the reading-heavy screens (tables, forms, pick lists) get a comfort cap. */
 .page { width: 100%; }
@@ -326,47 +326,55 @@ const CSS = `
 .page--step1 { max-width: 720px; }
 /* Shared column for stepper, PLF picker, and pick list — one vertical anchor. */
 .flow { width: 100%; max-width: 720px; }
-.flow .pg__banner { margin-bottom: 14px; }
+.flow .pg__banner { margin-bottom: 14px; display: flex; flex-direction: column; align-items: stretch; gap: 10px; }
+.flow .pg__banner .steps { width: 100%; }
+.flow .pg__banner-pad { display: none; }
 
 /* ---------- page furniture ---------- */
-.pg__title { margin: 0; font-size: 18px; font-weight: 650; }
+.pg__title { margin: 0; font-size: 16px; font-weight: 650; }
 .pg__sub { margin: 3px 0 0; color: var(--ink-500); font-size: 12.5px; max-width: 72ch; }
 .pg__head { margin-bottom: 14px; }
-.pg__head--row { display: flex; align-items: flex-start; gap: 12px; }
+.pg__head--row { display: flex; align-items: center; gap: 12px; }
 .pg__banner {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 12px 20px; flex-wrap: wrap; margin-bottom: 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
 }
-.pg__banner .pg__head { flex: 1 1 200px; min-width: 0; margin-bottom: 0; }
+.pg__banner .pg__head { min-width: 0; margin-bottom: 0; }
+.pg__banner-pad { min-width: 0; }
 .btn--back {
   display: inline-flex; align-items: center; gap: 6px;
-  padding: 6px 10px; flex: 0 0 auto; margin-top: 1px;
+  padding: 6px 10px; flex: 0 0 auto;
 }
 
-/* Compact inline stepper — sits on the title row so it does not eat a full card. */
+/* White step rail, centred on the title row. */
 .steps {
-  display: flex; align-items: center; justify-content: flex-end;
-  gap: 0; flex: 0 1 auto; width: auto; max-width: 100%;
-  margin: 0; padding: 4px 0;
-  border: 0; background: transparent; overflow: visible;
+  display: flex; align-items: center; justify-content: center;
+  gap: 0; width: auto; max-width: 100%;
+  margin: 0; padding: 8px 22px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--white);
+  overflow: visible;
 }
 .stepwrap { display: flex; align-items: center; flex: 0 0 auto; }
-.step { display: flex; align-items: center; gap: 7px; color: var(--ink-400); }
+.step { display: flex; align-items: center; gap: 8px; color: var(--ink-400); }
 .step b {
-  width: 24px; height: 24px; border-radius: 999px; flex: 0 0 24px;
+  width: 30px; height: 30px; border-radius: 999px; flex: 0 0 30px;
   display: inline-flex; align-items: center; justify-content: center;
-  background: var(--surface); border: 1.5px solid var(--line);
-  color: var(--ink-400); font-size: 12px; font-weight: 700;
+  background: var(--surface); border: 2px solid var(--line);
+  color: var(--ink-400); font-size: 14px; font-weight: 700;
 }
-.step__t { font-size: 12.5px; white-space: nowrap; }
+.step__t { display: inline; font-size: 13.5px; white-space: nowrap; font-weight: 500; }
 .step[data-on="1"] { color: var(--blue-800); font-weight: 650; }
 .step[data-on="1"] b {
   background: var(--blue-600); border-color: var(--blue-600); color: var(--white);
   box-shadow: 0 0 0 3px var(--blue-100);
 }
+.step[data-on="1"] .step__t { display: inline; color: var(--blue-800); }
 .step[data-done="1"] { color: var(--ink-500); }
 .step[data-done="1"] b { background: var(--go-fill); border-color: var(--go-line); color: var(--go); }
-.step__arrow { color: var(--ink-400); flex: 0 0 auto; margin: 0 8px; width: 14px; height: 14px; }
+.step__arrow { color: var(--ink-400); flex: 0 0 auto; margin: 0 12px; width: 16px; height: 16px; }
 
 .note {
   border: 1px solid var(--blue-200); background: var(--blue-50);
@@ -378,7 +386,7 @@ const CSS = `
 /* ---------- filters ---------- */
 .filters {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  padding: 9px 11px; margin-bottom: 12px;
+  padding: 6px 9px; margin-bottom: 8px;
   border: 1px solid var(--line); border-radius: 8px; background: var(--white);
 }
 .filters__label {
@@ -397,7 +405,7 @@ const CSS = `
 .filters__rule { width: 1px; align-self: stretch; background: var(--line); margin: 0 2px; }
 
 .chip {
-  padding: 4px 10px; border-radius: 999px; cursor: pointer;
+  padding: 3px 8px; border-radius: 999px; cursor: pointer;
   border: 1px solid var(--line); background: var(--white);
   font: inherit; font-size: 11.5px; color: var(--ink-700);
 }
@@ -413,9 +421,9 @@ const CSS = `
 .search:focus { outline: 2px solid var(--blue-200); outline-offset: 0; border-color: var(--blue-600); }
 
 /* ---------- layout: content + confirm sidebar ---------- */
-.work { display: flex; align-items: flex-start; gap: 14px; width: 100%; }
+.work { display: flex; align-items: flex-start; gap: 10px; width: 100%; }
 .work__main { flex: 1 1 0%; min-width: 0; }
-.work__side { flex: 0 0 320px; width: 320px; position: sticky; top: 0; }
+.work__side { flex: 0 0 248px; width: 248px; position: sticky; top: 0; }
 
 /* ---------- week grid ---------- */
 /* overflow-x must stay auto at every width: with visible overflow the min-width table
@@ -424,28 +432,28 @@ const CSS = `
 .gridwrap {
   overflow-x: auto;
   border: 1px solid var(--line); border-radius: 8px; background: var(--white);
-  padding-bottom: 40px; margin-bottom: -28px;
+  padding-bottom: 8px; margin-bottom: 0;
 }
 .grid { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 820px; }
 .grid th {
   position: sticky; top: 0; z-index: 1;
-  padding: 8px 6px; font-size: 11.5px; font-weight: 650; color: var(--ink-500);
+  padding: 6px 4px; font-size: 11px; font-weight: 650; color: var(--ink-500);
   background: var(--surface); border-bottom: 1px solid var(--line); text-align: center;
 }
-.grid th.grid__timehead { width: 78px; text-align: right; padding-right: 10px; }
-.grid td { padding: 4px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.grid th.grid__timehead { width: 64px; text-align: right; padding-right: 8px; }
+.grid td { padding: 3px; border-bottom: 1px solid var(--line); vertical-align: top; }
 .grid tr:last-child td { border-bottom: 0; }
 .grid__time {
-  width: 78px; text-align: right; padding-right: 10px !important;
-  font-size: 11.5px; color: var(--ink-500); white-space: nowrap; padding-top: 12px !important;
+  width: 64px; text-align: right; padding-right: 8px !important;
+  font-size: 11px; color: var(--ink-500); white-space: nowrap; padding-top: 8px !important;
 }
 
 /* ---------- slot cell ---------- */
 /* Fixed height on every cell: a shorter cell reads as a shorter session, which is not a thing. */
 .cell {
   position: relative; width: 100%; height: var(--cell-h);
-  display: flex; flex-direction: column; gap: 4px; justify-content: center;
-  padding: 9px 11px; border-radius: 8px; text-align: left;
+  display: flex; flex-direction: column; gap: 2px; justify-content: center;
+  padding: 5px 8px; border-radius: 6px; text-align: left;
   border: 1px solid var(--line); background: var(--white);
   font: inherit; color: var(--ink-900); cursor: default; overflow: hidden;
 }
@@ -467,8 +475,8 @@ const CSS = `
 .cell--join    { background: var(--go-fill); border: 2px solid var(--go); box-shadow: 0 0 0 3px rgba(46,125,58,.16); }
 
 .cell__top { display: flex; align-items: center; gap: 6px; }
-.cell__count { font-size: 15px; font-weight: 700; color: var(--ink-900); }
-.cell__own { font-size: 14px; font-weight: 650; }
+.cell__count { font-size: 13px; font-weight: 700; color: var(--ink-900); }
+.cell__own { font-size: 12.5px; font-weight: 650; }
 .cell__own--mine { color: var(--ink-700); }
 .cell__own--leaving { color: #fff; }
 .cell__hint { font-size: 11.5px; color: var(--ink-400); }
@@ -476,21 +484,21 @@ const CSS = `
 
 /* "Join 1" reads as a badge pinned to the corner, not a line competing with the count. */
 .cell__badge {
-  position: absolute; top: 50%; right: 8px; transform: translateY(-50%);
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 5px 11px; border-radius: 999px;
+  position: absolute; top: 50%; right: 6px; transform: translateY(-50%);
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 3px 8px; border-radius: 999px;
   background: var(--go); color: #fff;
-  font-size: 12.5px; font-weight: 700; letter-spacing: .2px;
-  box-shadow: 0 1px 4px rgba(46,125,58,.35);
+  font-size: 11px; font-weight: 700; letter-spacing: .2px;
+  box-shadow: 0 1px 3px rgba(46,125,58,.3);
 }
 .lrow__badge {
   display: inline-flex; align-items: center; gap: 3px;
   padding: 2px 8px; border-radius: 999px;
   background: var(--go); color: #fff; font-size: 10.5px; font-weight: 700;
 }
-.cell__of { font-weight: 500; color: var(--ink-400); font-size: 12.5px; }
+.cell__of { font-weight: 500; color: var(--ink-400); font-size: 11px; }
 .cell__meta {
-  min-height: 22px;
+  min-height: 18px;
   display: flex; align-items: center; flex-shrink: 0;
 }
 .cell__state { font-size: 12px; color: var(--ink-500); }
@@ -500,7 +508,7 @@ const CSS = `
 .cell__all li { display: flex; gap: 5px; padding: 1px 0; }
 
 .pips { display: flex; gap: 2px; flex-wrap: wrap; align-items: center; }
-.pip { width: 7px; height: 7px; border-radius: 2px; background: var(--line); }
+.pip { width: 5px; height: 5px; border-radius: 1.5px; background: var(--line); }
 .pip[data-on="1"] { background: var(--blue-600); }
 .pip--over { background: var(--amber); }
 
@@ -516,13 +524,13 @@ const CSS = `
 .tag__x { border: 0; background: transparent; color: inherit; cursor: pointer; font: inherit; font-size: 12px; line-height: 1; padding: 0 0 0 2px; }
 
 .cell__foot {
-  min-height: 24px; display: flex; align-items: center; flex-shrink: 0;
+  min-height: 18px; display: flex; align-items: center; flex-shrink: 0;
 }
 .needs {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 3px 9px; border-radius: 999px;
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 1px 7px; border-radius: 999px;
   background: #FEF2F2; color: #BE123C; border: 1px solid #FECDD3;
-  font-size: 10.5px; font-weight: 600; white-space: nowrap; line-height: 1.2;
+  font-size: 9.5px; font-weight: 600; white-space: nowrap; line-height: 1.2;
 }
 .needs--muted { opacity: .55; }
 
@@ -629,18 +637,18 @@ const CSS = `
   border: 1px solid var(--line); border-radius: 8px; background: var(--white);
   display: flex; flex-direction: column; overflow: hidden;
 }
-.side__head { padding: 10px 12px; border-bottom: 1px solid var(--line); background: var(--surface); }
-.side__title { font-size: 12.5px; font-weight: 650; }
-.side__match { font-size: 11.5px; margin-top: 2px; color: var(--ink-500); }
+.side__head { padding: 8px 10px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.side__title { font-size: 12px; font-weight: 650; }
+.side__match { font-size: 11px; margin-top: 1px; color: var(--ink-500); }
 .side__match b { color: var(--blue-800); }
-.side__body { padding: 10px 12px; display: flex; flex-direction: column; gap: 12px; }
-.side__group { display: flex; flex-direction: column; gap: 6px; }
-.side__label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: var(--ink-400); }
-.side__foot { padding: 10px 12px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 7px; }
+.side__body { padding: 8px 10px; display: flex; flex-direction: column; gap: 8px; }
+.side__group { display: flex; flex-direction: column; gap: 5px; }
+.side__label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: var(--ink-400); }
+.side__foot { padding: 8px 10px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; }
 
 .pick {
   display: flex; align-items: flex-start; gap: 8px;
-  padding: 7px 9px; border-radius: 6px; border: 1px solid var(--line); background: var(--white);
+  padding: 5px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--white);
 }
 .pick--leave { border-left: 3px solid var(--blue-800); }
 .pick--join  { border-left: 3px solid var(--go); }
@@ -654,8 +662,8 @@ const CSS = `
 .faclist__disc { color: var(--ink-400); flex: 0 0 auto; }
 .pick__x { border: 0; background: transparent; color: var(--ink-400); cursor: pointer; font: inherit; font-size: 14px; line-height: 1; }
 .waiting {
-  display: flex; align-items: center; gap: 9px;
-  padding: 9px 10px; border-radius: 6px;
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px; border-radius: 6px;
   border: 1.5px dashed var(--go-line); background: var(--go-fill);
 }
 .waiting__n {
@@ -837,28 +845,38 @@ const CSS = `
 .only-narrow { display: none; }
 
 /* ---------- responsive ----------
-   Default is laptop (13–15"). Roomier cells only kick in on large desktops.
-   <=1100  sidebar stacks under the grid
-   <=900   portrait iPad and below: list only
-   <=560   phone
+   Default is laptop (13–15", including 1080p / 125% scaled desktops).
+   Roomier cells need BOTH a wide AND a tall viewport.
 ------------------------------------ */
 
-@media (min-width: 1600px) {
-  .mvs__main { padding: 18px 24px 28px; }
-  .mvs { --cell-h: 88px; }
-  .work__side { flex-basis: 332px; width: 332px; }
-  .work { gap: 16px; }
-  .grid td { padding: 5px; }
-  .cell { padding: 10px 12px; }
-  .cell__count { font-size: 15.5px; }
-  .pg__title { font-size: 19px; }
-  .step b { width: 26px; height: 26px; flex-basis: 26px; font-size: 12.5px; }
+@media (min-width: 1680px) and (min-height: 960px) {
+  .mvs__main { padding: 14px 20px 20px; }
+  .mvs { --cell-h: 68px; }
+  .work__side { flex-basis: 280px; width: 280px; }
+  .work { gap: 12px; }
+  .grid td { padding: 4px; }
+  .cell { padding: 7px 10px; gap: 3px; }
+  .cell__count { font-size: 14px; }
+  .pg__title { font-size: 17px; }
+  .pip { width: 6px; height: 6px; }
 }
 
-@media (min-width: 1920px) {
-  .mvs { --cell-h: 100px; }
-  .mvs__main { padding: 22px 32px 34px; }
-  .work__side { flex-basis: 352px; width: 352px; }
+@media (min-width: 1920px) and (min-height: 1100px) {
+  .mvs { --cell-h: 80px; }
+  .mvs__main { padding: 18px 24px 24px; }
+  .work__side { flex-basis: 300px; width: 300px; }
+  .cell { padding: 9px 11px; }
+  .cell__count { font-size: 15px; }
+}
+
+@media (max-height: 800px) {
+  .mvs { --cell-h: 46px; }
+  .mvs__bar { height: 36px; }
+  .mvs__main { padding: 8px 12px 10px; }
+  .pg__banner { margin-bottom: 6px; }
+  .filters { margin-bottom: 6px; padding: 5px 8px; }
+  .cell { padding: 4px 7px; }
+  .cell__foot, .cell__meta { min-height: 16px; }
 }
 
 /* Below 1100px the sidebar stops competing with the grid for width and stacks under it,
@@ -877,10 +895,10 @@ const CSS = `
 }
 
 @media (max-width: 1100px) and (min-width: 901px) {
-  .mvs { --cell-h: 68px; }
-  .cell { padding: 7px 8px; }
-  .grid th.grid__timehead, .grid__time { width: 62px; }
-  .mvs__nav { flex-basis: 164px; width: 164px; }
+  .mvs { --cell-h: 48px; }
+  .cell { padding: 4px 6px; }
+  .grid th.grid__timehead, .grid__time { width: 56px; }
+  .mvs__nav { flex-basis: 148px; width: 148px; }
 }
 
 @media (max-width: 900px) {
@@ -891,12 +909,13 @@ const CSS = `
   .only-narrow { display: block; }
   .mvs__tabs { display: flex; }
   .lrow__when { flex-basis: 96px; }
-  .pg__banner { flex-direction: column; align-items: flex-start; gap: 8px; }
-  .pg__banner .steps { justify-content: flex-start; }
-  .steps { padding: 0; }
-  .step__arrow { margin: 0 7px; width: 13px; height: 13px; }
-  .step b { width: 22px; height: 22px; flex-basis: 22px; font-size: 11.5px; }
-  .step__t { font-size: 12px; }
+  .pg__banner { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+  .pg__banner .steps { justify-content: flex-start; padding: 7px 14px; }
+  .pg__banner-pad { display: none; }
+  .steps { padding: 7px 14px; }
+  .step__arrow { margin: 0 8px; width: 14px; height: 14px; }
+  .step b { width: 26px; height: 26px; flex-basis: 26px; font-size: 12.5px; }
+  .step__t { font-size: 12.5px; }
   .settings { max-width: none; }
   .plfpick__body { align-items: stretch; }
 }
@@ -909,7 +928,7 @@ const CSS = `
   .step1 { max-width: none; }
   .flow { max-width: none; }
   /* phone: numbered rail only, the active label alone keeps its text */
-  .steps { padding: 0; }
+  .steps { padding: 6px 12px; }
   .step__t { display: none; }
   .step[data-on="1"] .step__t { display: inline; font-size: 12px; }
   .step__arrow { margin: 0 6px; width: 12px; height: 12px; }
@@ -1248,7 +1267,7 @@ function StepArrow() {
     </svg>);
 }
 function Check(props) {
-    const n = props.big ? 12 : 11;
+    const n = props.big ? 14 : 11;
     return (<svg width={n} height={n} viewBox="0 0 12 12" aria-hidden>
       <path d="M2.5 6.3 4.8 8.6 9.5 3.9" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>);
@@ -1429,7 +1448,7 @@ function SlotRow(props) {
 function Steps(props) {
     const at = props.stage === "choose" ? 1 : props.stage === "join" ? 2 : 3;
     const items = ["Choose hours to leave", "Pick hours to join", "Confirm"];
-    return (<div className="steps">
+    return (<div className="steps" aria-label={"Step " + at + " of 3"}>
       {items.map((label, i) => {
             const n = i + 1;
             return (<div key={label} className="stepwrap">
@@ -1702,6 +1721,7 @@ function MoveFlow(props) {
           </p>
         </div>
         <Steps stage="choose"/>
+        <div className="pg__banner-pad" aria-hidden="true"/>
         </div>
 
         <div className="step1panel">
@@ -1794,12 +1814,10 @@ function MoveFlow(props) {
         </button>
         <div>
           <h1 className="pg__title">{props.self ? "Move a Shift" : "Move a Shift for " + props.who}</h1>
-          <p className="pg__sub">
-            Choose {leave.length} {plural(leave.length, "hour", "hours")} to join. Full hours are closed.
-          </p>
         </div>
       </div>
       <Steps stage="join"/>
+      <div className="pg__banner-pad" aria-hidden="true"/>
       </div>
 
       <Filters view={view} onView={setView} openOnly={openOnly} needsOnly={needsOnly} day={day} query={query} onOpen={() => setOpenOnly(!openOnly)} onNeeds={() => setNeedsOnly(!needsOnly)} onDay={setDay} onQuery={setQuery} onClear={() => {
