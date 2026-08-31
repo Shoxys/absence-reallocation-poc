@@ -346,19 +346,19 @@ const CSS = `
 .steps {
   display: flex; align-items: center; justify-content: center;
   gap: 0; width: 100%;
-  margin: 0; padding: 8px 18px;
+  margin: 0; padding: 10px 20px;
   border: 1px solid var(--line); border-radius: 8px; background: var(--white);
   overflow: visible;
 }
 .stepwrap { display: flex; align-items: center; flex: 0 0 auto; }
 .step { display: flex; align-items: center; gap: 8px; color: var(--ink-400); }
 .step b {
-  width: 26px; height: 26px; border-radius: 999px; flex: 0 0 26px;
+  width: 30px; height: 30px; border-radius: 999px; flex: 0 0 30px;
   display: inline-flex; align-items: center; justify-content: center;
   background: var(--surface); border: 1.5px solid var(--line);
-  color: var(--ink-400); font-size: 12.5px; font-weight: 700;
+  color: var(--ink-400); font-size: 14px; font-weight: 700;
 }
-.step__t { display: inline; font-size: 13px; white-space: nowrap; font-weight: 500; }
+.step__t { display: inline; font-size: 13.5px; white-space: nowrap; font-weight: 500; }
 .step[data-on="1"] { color: var(--blue-800); font-weight: 650; }
 .step[data-on="1"] b {
   background: var(--blue-600); border-color: var(--blue-600); color: var(--white);
@@ -369,7 +369,7 @@ const CSS = `
 .step[data-done="1"] b {
   background: var(--go-fill); border-color: var(--go-line); color: var(--go);
 }
-.step__arrow { color: var(--ink-400); flex: 0 0 auto; margin: 0 10px; width: 14px; height: 14px; opacity: .55; }
+.step__arrow { color: var(--ink-400); flex: 0 0 auto; margin: 0 12px; width: 15px; height: 15px; opacity: .55; }
 
 .note {
   border: 1px solid var(--blue-200); background: var(--blue-50);
@@ -884,12 +884,12 @@ const CSS = `
   .filters { margin-bottom: 6px; padding: 5px 8px; }
   .cell { padding: 4px 7px; }
   .cell__foot, .cell__meta { min-height: 16px; }
-  .steps { padding: 6px 14px; }
-  .step { gap: 6px; }
-  .step b { width: 22px; height: 22px; flex-basis: 22px; font-size: 11.5px; }
-  .step[data-on="1"] b { box-shadow: 0 0 0 2px var(--blue-100); }
-  .step__t { font-size: 12px; }
-  .step__arrow { margin: 0 8px; width: 12px; height: 12px; }
+  .steps { padding: 8px 16px; }
+  .step { gap: 8px; }
+  .step b { width: 26px; height: 26px; flex-basis: 26px; font-size: 12.5px; }
+  .step[data-on="1"] b { box-shadow: 0 0 0 3px var(--blue-100); }
+  .step__t { font-size: 13px; }
+  .step__arrow { margin: 0 10px; width: 14px; height: 14px; }
 }
 
 /* Below 1100px the sidebar stops competing with the grid for width and stacks under it,
@@ -1278,7 +1278,7 @@ function StepArrow() {
     </svg>);
 }
 function Check(props) {
-    const n = props.big ? 13 : 11;
+    const n = props.big ? 14 : 11;
     return (<svg width={n} height={n} viewBox="0 0 12 12" aria-hidden>
       <path d="M2.5 6.3 4.8 8.6 9.5 3.9" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>);
