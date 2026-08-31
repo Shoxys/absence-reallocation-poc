@@ -255,7 +255,7 @@ const CSS = `
   --amber-fill: #FFF7ED;
   --amber-line: #F5C89A;
 
-  --cell-h: 88px;
+  --cell-h: 72px;
 
   display: flex;
   flex-direction: column;
@@ -317,7 +317,7 @@ const CSS = `
 .mvs__navitem[data-on="1"] {
   color: var(--white); background: rgba(31,111,191,.34); border-left-color: var(--blue-400); font-weight: 600;
 }
-.mvs__main { flex: 1 1 auto; min-width: 0; overflow-y: auto; padding: 18px 20px 28px; }
+.mvs__main { flex: 1 1 auto; min-width: 0; overflow-y: auto; padding: 14px 18px 22px; }
 /* The timetable fills the viewport: it is the one screen that earns the width.
    Only the reading-heavy screens (tables, forms, pick lists) get a comfort cap. */
 .page { width: 100%; }
@@ -326,44 +326,47 @@ const CSS = `
 .page--step1 { max-width: 720px; }
 /* Shared column for stepper, PLF picker, and pick list — one vertical anchor. */
 .flow { width: 100%; max-width: 720px; }
-.flow .steps { margin-bottom: 18px; }
-.flow .pg__head { margin-bottom: 14px; }
+.flow .pg__banner { margin-bottom: 14px; }
 
 /* ---------- page furniture ---------- */
-.pg__title { margin: 0; font-size: 19px; font-weight: 650; }
+.pg__title { margin: 0; font-size: 18px; font-weight: 650; }
 .pg__sub { margin: 3px 0 0; color: var(--ink-500); font-size: 12.5px; max-width: 72ch; }
 .pg__head { margin-bottom: 14px; }
-.pg__head--row { display: flex; align-items: flex-start; gap: 14px; }
+.pg__head--row { display: flex; align-items: flex-start; gap: 12px; }
+.pg__banner {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px 20px; flex-wrap: wrap; margin-bottom: 12px;
+}
+.pg__banner .pg__head { flex: 1 1 200px; min-width: 0; margin-bottom: 0; }
 .btn--back {
   display: inline-flex; align-items: center; gap: 6px;
-  padding: 7px 12px; flex: 0 0 auto; margin-top: 2px;
+  padding: 6px 10px; flex: 0 0 auto; margin-top: 1px;
 }
 
-/* Steps: a large, centred progress rail across the top of the page.
-   Chevrons separate the stages; deliberately unlike the pill-shaped filter chips. */
+/* Compact inline stepper — sits on the title row so it does not eat a full card. */
 .steps {
-  display: flex; align-items: center; justify-content: center;
-  gap: 0; width: 100%; margin: 0 0 22px; padding: 18px 40px;
-  border: 1px solid var(--line); border-radius: 12px; background: var(--white);
-  overflow: visible;
+  display: flex; align-items: center; justify-content: flex-end;
+  gap: 0; flex: 0 1 auto; width: auto; max-width: 100%;
+  margin: 0; padding: 4px 0;
+  border: 0; background: transparent; overflow: visible;
 }
 .stepwrap { display: flex; align-items: center; flex: 0 0 auto; }
-.step { display: flex; align-items: center; gap: 12px; color: var(--ink-400); }
+.step { display: flex; align-items: center; gap: 7px; color: var(--ink-400); }
 .step b {
-  width: 40px; height: 40px; border-radius: 999px; flex: 0 0 40px;
+  width: 24px; height: 24px; border-radius: 999px; flex: 0 0 24px;
   display: inline-flex; align-items: center; justify-content: center;
-  background: var(--surface); border: 2px solid var(--line);
-  color: var(--ink-400); font-size: 17px; font-weight: 700;
+  background: var(--surface); border: 1.5px solid var(--line);
+  color: var(--ink-400); font-size: 12px; font-weight: 700;
 }
-.step__t { font-size: 15.5px; white-space: nowrap; }
+.step__t { font-size: 12.5px; white-space: nowrap; }
 .step[data-on="1"] { color: var(--blue-800); font-weight: 650; }
 .step[data-on="1"] b {
   background: var(--blue-600); border-color: var(--blue-600); color: var(--white);
-  box-shadow: 0 0 0 5px var(--blue-100);
+  box-shadow: 0 0 0 3px var(--blue-100);
 }
 .step[data-done="1"] { color: var(--ink-500); }
 .step[data-done="1"] b { background: var(--go-fill); border-color: var(--go-line); color: var(--go); }
-.step__arrow { color: var(--ink-400); flex: 0 0 auto; margin: 0 18px; }
+.step__arrow { color: var(--ink-400); flex: 0 0 auto; margin: 0 8px; width: 14px; height: 14px; }
 
 .note {
   border: 1px solid var(--blue-200); background: var(--blue-50);
@@ -421,7 +424,7 @@ const CSS = `
 .gridwrap {
   overflow-x: auto;
   border: 1px solid var(--line); border-radius: 8px; background: var(--white);
-  padding-bottom: 58px; margin-bottom: -46px;
+  padding-bottom: 40px; margin-bottom: -28px;
 }
 .grid { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 820px; }
 .grid th {
@@ -834,27 +837,28 @@ const CSS = `
 .only-narrow { display: none; }
 
 /* ---------- responsive ----------
-   >=1400  large desktop: roomier cells, wider sidebar
-   1100-1399 laptop: default
-   901-1099 small laptop / landscape iPad: narrower sidebar, tighter grid
-   <=900   portrait iPad and below: list only, sidebar becomes a sticky bottom panel
-   <=560   phone: single column, chips scroll
+   Default is laptop (13–15"). Roomier cells only kick in on large desktops.
+   <=1100  sidebar stacks under the grid
+   <=900   portrait iPad and below: list only
+   <=560   phone
 ------------------------------------ */
 
-@media (min-width: 1400px) {
-  .mvs__main { padding: 22px 30px 34px; }
-  .mvs { --cell-h: 104px; }
-  .work__side { flex-basis: 344px; width: 344px; }
-  .work { gap: 18px; }
+@media (min-width: 1600px) {
+  .mvs__main { padding: 18px 24px 28px; }
+  .mvs { --cell-h: 88px; }
+  .work__side { flex-basis: 332px; width: 332px; }
+  .work { gap: 16px; }
   .grid td { padding: 5px; }
-  .cell { padding: 11px 13px; }
-  .cell__count { font-size: 16px; }
+  .cell { padding: 10px 12px; }
+  .cell__count { font-size: 15.5px; }
+  .pg__title { font-size: 19px; }
+  .step b { width: 26px; height: 26px; flex-basis: 26px; font-size: 12.5px; }
 }
 
-@media (min-width: 1800px) {
-  .mvs { --cell-h: 116px; }
-  .mvs__main { padding: 26px 40px 40px; }
-  .work__side { flex-basis: 368px; width: 368px; }
+@media (min-width: 1920px) {
+  .mvs { --cell-h: 100px; }
+  .mvs__main { padding: 22px 32px 34px; }
+  .work__side { flex-basis: 352px; width: 352px; }
 }
 
 /* Below 1100px the sidebar stops competing with the grid for width and stacks under it,
@@ -873,8 +877,8 @@ const CSS = `
 }
 
 @media (max-width: 1100px) and (min-width: 901px) {
-  .mvs { --cell-h: 84px; }
-  .cell { padding: 8px 9px; }
+  .mvs { --cell-h: 68px; }
+  .cell { padding: 7px 8px; }
   .grid th.grid__timehead, .grid__time { width: 62px; }
   .mvs__nav { flex-basis: 164px; width: 164px; }
 }
@@ -887,10 +891,12 @@ const CSS = `
   .only-narrow { display: block; }
   .mvs__tabs { display: flex; }
   .lrow__when { flex-basis: 96px; }
-  .steps { padding: 14px 22px; margin-bottom: 16px; }
-  .step__arrow { margin: 0 8px; width: 15px; height: 15px; }
-  .step b { width: 32px; height: 32px; flex-basis: 32px; font-size: 14px; }
-  .step__t { font-size: 13px; }
+  .pg__banner { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .pg__banner .steps { justify-content: flex-start; }
+  .steps { padding: 0; }
+  .step__arrow { margin: 0 7px; width: 13px; height: 13px; }
+  .step b { width: 22px; height: 22px; flex-basis: 22px; font-size: 11.5px; }
+  .step__t { font-size: 12px; }
   .settings { max-width: none; }
   .plfpick__body { align-items: stretch; }
 }
@@ -899,15 +905,15 @@ const CSS = `
   .mvs__bar { height: auto; padding: 7px 12px; flex-wrap: wrap; gap: 8px; }
   .mvs__who { display: none; }
   .mvs__main { padding: 12px 11px 96px; }
-  .pg__title { font-size: 17px; }
+  .pg__title { font-size: 16px; }
   .step1 { max-width: none; }
   .flow { max-width: none; }
   /* phone: numbered rail only, the active label alone keeps its text */
-  .steps { padding: 12px 16px; }
+  .steps { padding: 0; }
   .step__t { display: none; }
-  .step[data-on="1"] .step__t { display: inline; font-size: 12.5px; }
-  .step__arrow { margin: 0 7px; width: 13px; height: 13px; }
-  .step b { width: 29px; height: 29px; flex-basis: 29px; font-size: 13px; }
+  .step[data-on="1"] .step__t { display: inline; font-size: 12px; }
+  .step__arrow { margin: 0 6px; width: 12px; height: 12px; }
+  .step b { width: 22px; height: 22px; flex-basis: 22px; font-size: 11.5px; }
   .filters { gap: 6px; padding: 8px; }
   .filters .chip { font-size: 11px; padding: 4px 8px; }
   .lrow { flex-wrap: wrap; gap: 7px; }
@@ -1242,7 +1248,7 @@ function StepArrow() {
     </svg>);
 }
 function Check(props) {
-    const n = props.big ? 18 : 11;
+    const n = props.big ? 12 : 11;
     return (<svg width={n} height={n} viewBox="0 0 12 12" aria-hidden>
       <path d="M2.5 6.3 4.8 8.6 9.5 3.9" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>);
@@ -1686,6 +1692,7 @@ function MoveFlow(props) {
         const noRoster = allMine.length === 0;
         return (<div className="page page--step1">
         <div className="flow">
+        <div className="pg__banner">
         <div className="pg__head">
           <h1 className="pg__title">{props.self ? "Move a Shift" : "Move a Shift for a PLF"}</h1>
           <p className="pg__sub">
@@ -1694,8 +1701,8 @@ function MoveFlow(props) {
                 : "Move hours for a PLF on their discipline roster. Their total hours stay the same."}
           </p>
         </div>
-
         <Steps stage="choose"/>
+        </div>
 
         <div className="step1panel">
         {!props.self ? (<div className="step1panel__who">
@@ -1780,6 +1787,7 @@ function MoveFlow(props) {
         grid[s.day + "-" + s.timeKey] = s;
     });
     return (<div className="page">
+      <div className="pg__banner">
       <div className="pg__head pg__head--row">
         <button type="button" className="btn btn--back" onClick={() => setStage("choose")}>
           <BackArrow /> Back
@@ -1791,8 +1799,8 @@ function MoveFlow(props) {
           </p>
         </div>
       </div>
-
       <Steps stage="join"/>
+      </div>
 
       <Filters view={view} onView={setView} openOnly={openOnly} needsOnly={needsOnly} day={day} query={query} onOpen={() => setOpenOnly(!openOnly)} onNeeds={() => setNeedsOnly(!needsOnly)} onDay={setDay} onQuery={setQuery} onClear={() => {
             setOpenOnly(false);
