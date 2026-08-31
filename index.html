@@ -255,7 +255,7 @@ const CSS = `
   --amber-fill: #FFF7ED;
   --amber-line: #F5C89A;
 
-  --cell-h: 52px;
+  --cell-h: 60px;
 
   display: flex;
   flex-direction: column;
@@ -349,32 +349,33 @@ const CSS = `
   padding: 6px 10px; flex: 0 0 auto;
 }
 
-/* White step rail, centred on the title row. */
+/* Steps sit on the page canvas like the title — no floating card. */
 .steps {
   display: flex; align-items: center; justify-content: center;
   gap: 0; width: auto; max-width: 100%;
-  margin: 0; padding: 8px 22px;
-  border: 1px solid var(--line); border-radius: 10px; background: var(--white);
-  overflow: visible;
+  margin: 0; padding: 0;
+  border: 0; background: transparent; overflow: visible;
 }
 .stepwrap { display: flex; align-items: center; flex: 0 0 auto; }
 .step { display: flex; align-items: center; gap: 8px; color: var(--ink-400); }
 .step b {
-  width: 30px; height: 30px; border-radius: 999px; flex: 0 0 30px;
+  width: 28px; height: 28px; border-radius: 999px; flex: 0 0 28px;
   display: inline-flex; align-items: center; justify-content: center;
-  background: var(--surface); border: 2px solid var(--line);
-  color: var(--ink-400); font-size: 14px; font-weight: 700;
+  background: transparent; border: 1.5px solid var(--ink-400);
+  color: var(--ink-400); font-size: 13px; font-weight: 700;
 }
 .step__t { display: inline; font-size: 13.5px; white-space: nowrap; font-weight: 500; }
 .step[data-on="1"] { color: var(--blue-800); font-weight: 650; }
 .step[data-on="1"] b {
   background: var(--blue-600); border-color: var(--blue-600); color: var(--white);
-  box-shadow: 0 0 0 3px var(--blue-100);
+  box-shadow: none;
 }
 .step[data-on="1"] .step__t { display: inline; color: var(--blue-800); }
-.step[data-done="1"] { color: var(--ink-500); }
-.step[data-done="1"] b { background: var(--go-fill); border-color: var(--go-line); color: var(--go); }
-.step__arrow { color: var(--ink-400); flex: 0 0 auto; margin: 0 12px; width: 16px; height: 16px; }
+.step[data-done="1"] { color: var(--go); }
+.step[data-done="1"] b {
+  background: transparent; border-color: var(--go); color: var(--go);
+}
+.step__arrow { color: var(--ink-400); flex: 0 0 auto; margin: 0 14px; width: 16px; height: 16px; opacity: .55; }
 
 .note {
   border: 1px solid var(--blue-200); background: var(--blue-50);
@@ -421,30 +422,30 @@ const CSS = `
 .search:focus { outline: 2px solid var(--blue-200); outline-offset: 0; border-color: var(--blue-600); }
 
 /* ---------- layout: content + confirm sidebar ---------- */
-.work { display: flex; align-items: flex-start; gap: 10px; width: 100%; }
+.work { display: flex; align-items: flex-start; gap: 10px; width: 100%; min-width: 0; }
 .work__main { flex: 1 1 0%; min-width: 0; }
-.work__side { flex: 0 0 248px; width: 248px; position: sticky; top: 0; }
+.work__side { flex: 0 0 248px; width: 248px; max-width: 248px; position: sticky; top: 0; }
 
 /* ---------- week grid ---------- */
 /* overflow-x must stay auto at every width: with visible overflow the min-width table
    spills out of its flex box and renders underneath the confirm sidebar.
    Tooltips open downwards and the wrap reserves room for the last row instead. */
 .gridwrap {
-  overflow-x: auto;
+  overflow: hidden;
   border: 1px solid var(--line); border-radius: 8px; background: var(--white);
-  padding-bottom: 8px; margin-bottom: 0;
+  padding-bottom: 0; margin-bottom: 0;
 }
-.grid { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 820px; }
+.grid { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; }
 .grid th {
   position: sticky; top: 0; z-index: 1;
   padding: 6px 4px; font-size: 11px; font-weight: 650; color: var(--ink-500);
   background: var(--surface); border-bottom: 1px solid var(--line); text-align: center;
 }
-.grid th.grid__timehead { width: 64px; text-align: right; padding-right: 8px; }
+.grid th.grid__timehead { width: 72px; text-align: right; padding-right: 8px; }
 .grid td { padding: 3px; border-bottom: 1px solid var(--line); vertical-align: top; }
 .grid tr:last-child td { border-bottom: 0; }
 .grid__time {
-  width: 64px; text-align: right; padding-right: 8px !important;
+  width: 72px; text-align: right; padding-right: 8px !important;
   font-size: 11px; color: var(--ink-500); white-space: nowrap; padding-top: 8px !important;
 }
 
@@ -452,8 +453,8 @@ const CSS = `
 /* Fixed height on every cell: a shorter cell reads as a shorter session, which is not a thing. */
 .cell {
   position: relative; width: 100%; height: var(--cell-h);
-  display: flex; flex-direction: column; gap: 2px; justify-content: center;
-  padding: 5px 8px; border-radius: 6px; text-align: left;
+  display: flex; flex-direction: column; gap: 3px; justify-content: center;
+  padding: 6px 8px; border-radius: 6px; text-align: left;
   border: 1px solid var(--line); background: var(--white);
   font: inherit; color: var(--ink-900); cursor: default; overflow: hidden;
 }
@@ -528,9 +529,11 @@ const CSS = `
 }
 .needs {
   display: inline-flex; align-items: center; gap: 3px;
+  max-width: 100%;
   padding: 1px 7px; border-radius: 999px;
   background: #FEF2F2; color: #BE123C; border: 1px solid #FECDD3;
   font-size: 9.5px; font-weight: 600; white-space: nowrap; line-height: 1.2;
+  overflow: hidden; text-overflow: ellipsis;
 }
 .needs--muted { opacity: .55; }
 
@@ -870,7 +873,7 @@ const CSS = `
 }
 
 @media (max-height: 800px) {
-  .mvs { --cell-h: 46px; }
+  .mvs { --cell-h: 54px; }
   .mvs__bar { height: 36px; }
   .mvs__main { padding: 8px 12px 10px; }
   .pg__banner { margin-bottom: 6px; }
@@ -895,7 +898,7 @@ const CSS = `
 }
 
 @media (max-width: 1100px) and (min-width: 901px) {
-  .mvs { --cell-h: 48px; }
+  .mvs { --cell-h: 56px; }
   .cell { padding: 4px 6px; }
   .grid th.grid__timehead, .grid__time { width: 56px; }
   .mvs__nav { flex-basis: 148px; width: 148px; }
@@ -910,9 +913,9 @@ const CSS = `
   .mvs__tabs { display: flex; }
   .lrow__when { flex-basis: 96px; }
   .pg__banner { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
-  .pg__banner .steps { justify-content: flex-start; padding: 7px 14px; }
+  .pg__banner .steps { justify-content: flex-start; padding: 0; }
   .pg__banner-pad { display: none; }
-  .steps { padding: 7px 14px; }
+  .steps { padding: 0; }
   .step__arrow { margin: 0 8px; width: 14px; height: 14px; }
   .step b { width: 26px; height: 26px; flex-basis: 26px; font-size: 12.5px; }
   .step__t { font-size: 12.5px; }
@@ -928,7 +931,7 @@ const CSS = `
   .step1 { max-width: none; }
   .flow { max-width: none; }
   /* phone: numbered rail only, the active label alone keeps its text */
-  .steps { padding: 6px 12px; }
+  .steps { padding: 0; }
   .step__t { display: none; }
   .step[data-on="1"] .step__t { display: inline; font-size: 12px; }
   .step__arrow { margin: 0 6px; width: 12px; height: 12px; }
