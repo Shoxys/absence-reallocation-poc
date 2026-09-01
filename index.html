@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-store" />
   <title>Move a Shift - Phase 1 prototype</title>
   <style>
     * { box-sizing: border-box; }
@@ -311,6 +312,18 @@ const CSS = `
 }
 .mvs__demo button[data-on="1"] { background: var(--white); color: var(--stim-header); }
 
+.mvs__navtoggle {
+  display: none;
+  flex: 0 0 auto;
+  align-items: center; justify-content: center;
+  width: 36px; height: 36px; margin-right: 4px;
+  border: 0; border-radius: 6px; cursor: pointer;
+  background: rgba(255,255,255,.12); color: #fff;
+  padding: 0;
+}
+.mvs__navtoggle:hover { background: rgba(255,255,255,.2); }
+.mvs__scrim { display: none; }
+
 /* Compact iPhone-style notch: hangs from the navy bar, centred over the content column.
    1px tuck hides the bar's bottom edge; z-index above the bar so it is not clipped. */
 .mvs__notch {
@@ -369,7 +382,7 @@ const CSS = `
    Only the reading-heavy screens (tables, forms, pick lists) get a comfort cap. */
 .page { width: 100%; }
 .page--narrow { max-width: 1100px; }
-.page--moves { width: 100%; max-width: none; }
+.page--moves { width: 100%; }
 .page--step1 { max-width: none; }
 .flow {
   width: 100%;
@@ -453,11 +466,37 @@ const CSS = `
 
 /* ---------- filters ---------- */
 .filters {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  padding: 7px 10px; margin: 0;
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 8px 10px; margin: 0;
   border: 0; border-bottom: 1px solid var(--line); border-radius: 0;
   background: var(--white);
 }
+.filters__row {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; width: 100%;
+}
+.filters__row--tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  width: 100%;
+}
+.searchwrap {
+  position: relative;
+  flex: 0 1 280px;
+  width: 280px;
+  max-width: 280px;
+  min-width: 180px;
+}
+.searchwrap__icon {
+  position: absolute;
+  left: 10px; top: 50%;
+  transform: translateY(-50%);
+  color: var(--ink-400);
+  pointer-events: none;
+  display: flex;
+}
+.searchwrap .search { padding-left: 32px; }
 .filters__label {
   display: inline-flex; align-items: center; gap: 6px;
   font-size: 11px; font-weight: 700; letter-spacing: .4px;
@@ -483,9 +522,9 @@ const CSS = `
 .chip--rose[data-on="1"] { border-color: var(--rose); background: var(--rose-fill); color: var(--rose); }
 
 .search {
-  flex: 1 1 160px; min-width: 120px;
-  padding: 5px 10px; border: 1px solid var(--line); border-radius: 6px;
-  font: inherit; font-size: 12px; color: var(--ink-900); background: var(--white);
+  min-width: 0; width: 100%;
+  padding: 8px 14px; border: 1px solid var(--line); border-radius: 6px;
+  font: inherit; font-size: 13px; color: var(--ink-900); background: var(--white);
 }
 .search:focus { outline: 2px solid var(--blue-200); outline-offset: 0; border-color: var(--blue-600); }
 
@@ -635,7 +674,7 @@ const CSS = `
 /* :focus-within alone kept the bubble open after a click; :focus-visible fires for keyboard only. */
 .tip:has(:focus-visible) .tip__b { opacity: 1; visibility: visible; }
 .tip:active .tip__b { opacity: 0; visibility: hidden; }
-.tbl__act .tip__b {
+.tbl__cancel .tip__b {
   left: auto; right: 0; transform: none;
 }
 
@@ -795,20 +834,22 @@ const CSS = `
 .card__body { padding: 13px; }
 
 .tblwrap { overflow: visible; }
-.tbl { width: 100%; border-collapse: collapse; table-layout: auto; }
-.tbl col.c-plf   { width: 12%; }
-.tbl col.c-leave { width: 20%; }
-.tbl col.c-join  { width: 20%; }
-.tbl col.c-hrs   { width: 8%; }
-.tbl col.c-by    { width: 14%; }
-.tbl col.c-act   { width: 26%; }
+.tbl { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.tbl col.c-plf    { width: 12%; }
+.tbl col.c-leave  { width: 16%; }
+.tbl col.c-join   { width: 16%; }
+.tbl col.c-hrs    { width: 8%; }
+.tbl col.c-by     { width: 12%; }
+.tbl col.c-status { width: 16%; }
+.tbl col.c-date   { width: 10%; }
+.tbl col.c-cancel { width: 10%; }
 .tbl th {
-  text-align: left; padding: 10px 14px; font-size: 10.5px; font-weight: 700;
+  text-align: left; padding: 10px 12px; font-size: 10.5px; font-weight: 700;
   text-transform: uppercase; letter-spacing: .5px; color: var(--ink-400);
   border-bottom: 1px solid var(--line); background: var(--surface); white-space: nowrap;
 }
 .tbl td {
-  padding: 12px 14px; border-bottom: 1px solid var(--line);
+  padding: 12px 12px; border-bottom: 1px solid var(--line);
   font-size: 12.5px; vertical-align: top;
   overflow-wrap: break-word; word-break: normal;
 }
@@ -817,16 +858,15 @@ const CSS = `
 .tbl__plf { font-weight: 650; font-size: 13px; }
 .tbl__sub { font-size: 11px; color: var(--ink-500); margin-top: 2px; }
 .tbl__hrs { font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.tbl__act { vertical-align: middle; width: 26%; }
-.tbl__act-inner {
-  display: flex; flex-wrap: wrap; align-items: flex-start;
-  gap: 8px; min-width: 0;
-}
+.tbl__date { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tbl__by { white-space: nowrap; }
+.tbl__status { vertical-align: top; }
+.tbl__cancel { vertical-align: top; white-space: nowrap; }
 .tbl__badges {
-  display: flex; flex-direction: column; align-items: flex-start;
-  gap: 6px; flex: 1 1 8rem; min-width: 0;
+  display: flex; flex-wrap: nowrap; align-items: center;
+  gap: 6px;
 }
-.tbl__act-inner .btn { white-space: nowrap; flex: 0 0 auto; }
+.tbl__cancel .btn { white-space: nowrap; }
 .colhead { display: inline-flex; align-items: center; gap: 6px; }
 .colhead::before { content: ""; width: 6px; height: 6px; border-radius: 999px; }
 .colhead--leave::before { background: var(--leave); }
@@ -838,6 +878,7 @@ const CSS = `
 .pill {
   display: inline-block; padding: 2px 8px; border-radius: 999px;
   font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px;
+  white-space: nowrap;
 }
 .pill--active { background: var(--blue-50); color: var(--blue-800); border: 1px solid var(--blue-200); }
 .pill--over { background: var(--amber-fill); color: var(--amber); border: 1px solid var(--amber-line); cursor: help; }
@@ -1081,7 +1122,30 @@ const CSS = `
 }
 
 @media (max-width: 900px) {
-  .mvs { font-size: 12.5px; }
+  .mvs { font-size: 12.5px; --nav-w: 0px; }
+  .mvs__navtoggle { display: inline-flex; }
+  .mvs__nav {
+    position: fixed;
+    top: var(--bar-h); left: 0; bottom: 0;
+    flex: none;
+    width: 220px;
+    z-index: 60;
+    transform: translateX(-100%);
+    transition: transform .2s ease;
+    box-shadow: 4px 0 16px rgba(0,0,0,.18);
+    pointer-events: none;
+  }
+  .mvs.nav-open .mvs__nav { transform: none; pointer-events: auto; }
+  .mvs.nav-open .mvs__scrim {
+    display: block;
+    position: fixed;
+    top: var(--bar-h); left: 0; right: 0; bottom: 0;
+    background: rgba(27,36,48,.28);
+    z-index: 55;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+  }
   .mvs__main { padding: 14px 14px 96px; }
   .gridwrap { display: none; }
   .only-wide { display: none; }
@@ -1096,12 +1160,19 @@ const CSS = `
   .needs { white-space: normal; overflow: visible; text-overflow: unset; }
   .step1panel .pickrow__main { flex-direction: column; align-items: flex-start; gap: 2px; }
   .step1panel .pickrow__dot { display: none; }
-  .tbl__act-inner { flex-direction: column; align-items: flex-start; }
 }
 
 @media (max-width: 560px) {
   .mvs { font-size: 12px; }
   .mvs__bar { height: auto; min-height: var(--bar-h); padding: 8px 12px; flex-wrap: wrap; gap: 8px; }
+  .mvs__notch {
+    position: relative;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: auto;
+  }
+  .mvs.has-notch .mvs__main { padding-top: 10px; }
   .mvs__brand { font-size: 14px; }
   .mvs__who-block { display: none; }
   .mvs__main { padding: 12px 11px 96px; }
@@ -1130,21 +1201,13 @@ const CSS = `
 
 /* Day chips scroll rather than wrapping into a tall stack on narrow screens. */
 @media (max-width: 900px) {
-  .filters { flex-wrap: nowrap; overflow-x: auto; }
-  .filters > * { flex: 0 0 auto; }
-  .filters .search { flex: 1 0 150px; }
+  .filters { overflow: visible; }
+  .filters__row--tools { flex-wrap: wrap; }
+  .searchwrap { flex: 1 1 100%; width: 100%; max-width: none; }
   .tblwrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .tbl { min-width: 760px; }
 }
 
-@media (min-width: 901px) { .mvs__tabs { display: none; } }
-
-.mvs__tabs {
-  display: none;
-  gap: 6px; padding: 8px 12px; background: var(--white);
-  border-bottom: 1px solid var(--line); overflow-x: auto; flex: 0 0 auto;
-}
-.mvs__tabs .chip { white-space: nowrap; }
 `;
 const CAMPUS = {
     gp: { short: "GP", name: "Gardens Point" },
@@ -1384,6 +1447,8 @@ const SLOTS = [
     slot("Fri", "13", "online", [{ name: "Kate N", disc: "SCI" }]),
 ];
 const MY_SHIFTS = ["mon-14-gp", "mon-15-gp", "thu-10-kg", "thu-11-kg"];
+/** Week commencing for this mock. Active list Date and MoveGroup week date. */
+const WEEK_OF = "31 Aug 2026";
 const SEED_MOVES = [
     {
         id: 1,
@@ -1392,6 +1457,7 @@ const SEED_MOVES = [
         join: ["Mon 10:00 AM, GP"],
         by: "Self",
         status: "active",
+        weekOf: WEEK_OF,
     },
     {
         id: 2,
@@ -1400,6 +1466,7 @@ const SEED_MOVES = [
         join: ["Tue 10:00 AM, KG", "Wed 12:00 PM, GP"],
         by: "Priya N (SSP)",
         status: "active",
+        weekOf: WEEK_OF,
         overflowReason: "Room double-booked; cleared with the coordinator.",
     },
 ];
@@ -1522,6 +1589,19 @@ function StepArrow(props) {
     return (<svg className="step__arrow" data-done={props.done ? "1" : "0"} width="36" height="12" viewBox="0 0 36 12" aria-hidden>
       <path d="M1 6h26" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
       <path d="M23.5 2.2 33 6l-9.5 3.8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>);
+}
+function SearchIcon() {
+    return (<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden>
+      <circle cx="6.6" cy="6.6" r="4.3" fill="none" stroke="currentColor" strokeWidth="1.7"/>
+      <path d="M9.8 9.8 13.4 13.4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/>
+    </svg>);
+}
+function NavChevron(props) {
+    return (<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden>
+      {props.open
+        ? <path d="M10 3.2 5.2 8 10 12.8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+        : <path d="M6 3.2 10.8 8 6 12.8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>}
     </svg>);
 }
 function Check(props) {
@@ -1730,6 +1810,7 @@ function Filters(props) {
     const campusOffDefault = props.campus !== props.primaryCampus;
     const active = (props.openOnly ? 1 : 0) + (props.needsOnly ? 1 : 0) + (props.day !== "All" ? 1 : 0) + (campusOffDefault ? 1 : 0) + (props.query ? 1 : 0);
     return (<div className="filters">
+      <div className="filters__row">
       <span className="filters__label">
         Filters
         {active > 0 ? <span className="filters__count">{active}</span> : null}
@@ -1748,10 +1829,11 @@ function Filters(props) {
       {["All"].concat(DAYS).map((d) => (<button key={d} type="button" className="chip" data-on={props.day === d ? "1" : "0"} onClick={() => props.onDay(d)}>
           {d}
         </button>))}
-      <input className="search" placeholder="Search hours or people" value={props.query} onChange={(e) => props.onQuery(e.target.value)}/>
-      <span className="only-wide">
-        <span className="filters__rule"/>
-      </span>
+      {active > 0 ? (<button type="button" className="filters__clear" onClick={props.onClear}>
+          Clear filters
+        </button>) : null}
+      </div>
+      <div className="filters__row filters__row--tools">
       <span className="only-wide">
         <button type="button" className="chip" data-on={props.view === "week" ? "1" : "0"} onClick={() => props.onView("week")}>
           Week grid
@@ -1762,9 +1844,11 @@ function Filters(props) {
           Browse list
         </button>
       </span>
-      {active > 0 ? (<button type="button" className="filters__clear" onClick={props.onClear}>
-          Clear filters
-        </button>) : null}
+      <label className="searchwrap">
+        <span className="searchwrap__icon"><SearchIcon /></span>
+        <input className="search" placeholder="Search hours or people" value={props.query} onChange={(e) => props.onQuery(e.target.value)} aria-label="Search hours or people"/>
+      </label>
+      </div>
     </div>);
 }
 /** Collapsed facilitator line with a working "+N more" disclosure. */
@@ -2200,26 +2284,30 @@ function ActiveMoves(props) {
                 <col className="c-join"/>
                 <col className="c-hrs"/>
                 <col className="c-by"/>
-                <col className="c-act"/>
+                <col className="c-status"/>
+                <col className="c-date"/>
+                <col className="c-cancel"/>
               </colgroup>
               <thead>
                 <tr>
-                  <th>PLF</th>
+                  <th className="tbl__plf">PLF</th>
                   <th>
                     <span className="colhead colhead--leave">Leaving</span>
                   </th>
                   <th>
                     <span className="colhead colhead--join">Joining</span>
                   </th>
-                  <th>Hours</th>
-                  <th>Arranged by</th>
-                  <th className="tbl__act">Status</th>
+                  <th className="tbl__hrs">Hours</th>
+                  <th className="tbl__by">Arranged by</th>
+                  <th className="tbl__status">Status</th>
+                  <th className="tbl__date">Date</th>
+                  <th className="tbl__cancel"/>
                 </tr>
               </thead>
               <tbody>
                 {props.moves.map((m) => (<tr key={m.id}>
-                    <td>
-                      <div className="tbl__plf">{m.plf}</div>
+                    <td className="tbl__plf">
+                      <div>{m.plf}</div>
                     </td>
                     <td>
                       {m.leave.map((x, i) => (<div key={i} className="mv mv--leave">
@@ -2235,22 +2323,23 @@ function ActiveMoves(props) {
                       {Math.max(m.leave.length, m.join.length)}{" "}
                       {plural(Math.max(m.leave.length, m.join.length), "hour", "hours")}
                     </td>
-                    <td>{m.by}</td>
-                    <td className="tbl__act">
-                      <div className="tbl__act-inner">
-                        <MoveStatusBadges overflowReason={m.overflowReason}/>
-                        <Tip text={"Cancels all " +
+                    <td className="tbl__by">{m.by}</td>
+                    <td className="tbl__status">
+                      <MoveStatusBadges overflowReason={m.overflowReason}/>
+                    </td>
+                    <td className="tbl__date">{m.weekOf || WEEK_OF}</td>
+                    <td className="tbl__cancel">
+                      <Tip text={"Cancels all " +
                     m.leave.length +
                     " leaving and " +
                     m.join.length +
                     " joining " +
                     plural(m.join.length, "hour", "hours") +
                     ". Moves cannot be cancelled in part."}>
-                          <button type="button" className="btn btn--danger btn--compact" onClick={() => props.onCancel(m.id)}>
-                            Cancel move
-                          </button>
-                        </Tip>
-                      </div>
+                        <button type="button" className="btn btn--danger btn--compact" onClick={() => props.onCancel(m.id)}>
+                          Cancel move
+                        </button>
+                      </Tip>
                     </td>
                   </tr>))}
               </tbody>
@@ -2348,6 +2437,10 @@ function AbsenceReallocationPhase1Prototype() {
     const [toast, setToast] = useCanvasState("mvs_toast", null);
     const [plfStage] = useCanvasState("mvs_p_stage", "choose");
     const [sspStage] = useCanvasState("mvs_a_stage", "choose");
+    const [navOpen, setNavOpen] = useState(false);
+    useEffect(() => {
+        setNavOpen(false);
+    }, [screen, role]);
     useEffect(() => {
         if (!toast)
             return;
@@ -2387,6 +2480,7 @@ function AbsenceReallocationPhase1Prototype() {
             }),
             by,
             status: "active",
+            weekOf: WEEK_OF,
         };
         setMoves([next].concat(moves));
         setToast("Move applied. This mock has reset so you can try another move.");
@@ -2394,12 +2488,15 @@ function AbsenceReallocationPhase1Prototype() {
     const roleTitle = role === "admin" ? "Administrator" : role === "ssp" ? "Duty Host" : "PLF";
     const onMoveFlow = current === "move" || current === "assign";
     const moveStage = current === "assign" ? sspStage : plfStage;
-    return (<div className={"mvs" + (onMoveFlow ? " has-notch" : "")}>
+    return (<div className={"mvs" + (onMoveFlow ? " has-notch" : "") + (navOpen ? " nav-open" : "")}>
       <style>{CSS}</style>
 
       <div className="mvs__bar">
+        <button type="button" className="mvs__navtoggle" aria-label={navOpen ? "Close menu" : "Open menu"} aria-expanded={navOpen} onClick={() => setNavOpen(!navOpen)}>
+          <NavChevron open={navOpen}/>
+        </button>
         <div className="mvs__branding">
-          <span className="mvs__brand">Student Success – STEM Support</span>
+          <span className="mvs__brand">Student Success - STEM Support</span>
         </div>
         <span className="mvs__spacer"/>
         <span className="mvs__demo">
@@ -2407,18 +2504,21 @@ function AbsenceReallocationPhase1Prototype() {
           <button type="button" data-on={role === "plf" ? "1" : "0"} onClick={() => {
             setRole("plf");
             setScreen("move");
+            setNavOpen(false);
         }}>
             PLF
           </button>
           <button type="button" data-on={role === "ssp" ? "1" : "0"} onClick={() => {
             setRole("ssp");
             setScreen("active");
+            setNavOpen(false);
         }}>
             SSP
           </button>
           <button type="button" data-on={role === "admin" ? "1" : "0"} onClick={() => {
             setRole("admin");
             setScreen("active");
+            setNavOpen(false);
         }}>
             Admin
           </button>
@@ -2431,16 +2531,15 @@ function AbsenceReallocationPhase1Prototype() {
 
       {onMoveFlow ? (<div className="mvs__notch"><Steps stage={moveStage}/></div>) : null}
 
-      <div className="mvs__tabs">
-        {nav.map((n) => (<button key={n.id} type="button" className="chip" data-on={current === n.id ? "1" : "0"} onClick={() => setScreen(n.id)}>
-            {n.label}
-          </button>))}
-      </div>
+      <button type="button" className="mvs__scrim" aria-label="Close menu" onClick={() => setNavOpen(false)}/>
 
       <div className="mvs__body">
-        <nav className="mvs__nav">
+        <nav className="mvs__nav" aria-label="Primary">
           <div className="mvs__navhead">{isPlf ? "My roster" : "Administration"}</div>
-          {nav.map((n) => (<button key={n.id} type="button" className="mvs__navitem" data-on={current === n.id ? "1" : "0"} onClick={() => setScreen(n.id)}>
+          {nav.map((n) => (<button key={n.id} type="button" className="mvs__navitem" data-on={current === n.id ? "1" : "0"} onClick={() => {
+                setScreen(n.id);
+                setNavOpen(false);
+            }}>
               {n.label}
             </button>))}
         </nav>
