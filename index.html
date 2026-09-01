@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Absence Reallocation — Phase 1 Prototype</title>
+  <title>Move a Shift - Phase 1 prototype</title>
   <style>
     * { box-sizing: border-box; }
     html, body { height: 100%; }
@@ -261,6 +261,7 @@ const CSS = `
   --cell-h: 68px;
   --bar-h: 60px;
   --nav-w: 220px;
+  --side-w: 248px;
   --stim-header: #114A81;
   --stim-nav: #2E3846;
 
@@ -310,15 +311,16 @@ const CSS = `
 }
 .mvs__demo button[data-on="1"] { background: var(--white); color: var(--stim-header); }
 
-/* Compact iPhone-style notch: hangs from the navy bar over the title row. */
+/* Compact iPhone-style notch: hangs from the navy bar, centred over the content column.
+   1px tuck hides the bar's bottom edge; z-index above the bar so it is not clipped. */
 .mvs__notch {
   position: absolute;
-  top: var(--bar-h);
+  top: calc(var(--bar-h) - 1px);
   left: var(--nav-w);
   right: 0;
   height: 0;
   display: flex; justify-content: center;
-  z-index: 36;
+  z-index: 50;
   pointer-events: none;
   background: transparent;
   border: 0;
@@ -328,13 +330,13 @@ const CSS = `
   pointer-events: auto;
   width: auto;
   background: #fff;
-  border-radius: 0 0 20px 20px;
-  box-shadow: 0 8px 20px rgba(17,74,129,.16);
-  padding: 8px 20px 11px;
+  border-radius: 0 0 22px 22px;
+  box-shadow: 0 4px 8px rgba(17,74,129,.08);
+  padding: 18px 32px 18px;
 }
-.mvs.has-notch .mvs__main { padding-top: 10px; }
+.mvs.has-notch .mvs__main { padding-top: 22px; }
 .mvs.has-notch .pg__banner {
-  min-height: 44px;
+  min-height: 64px;
   flex-direction: row;
   align-items: center;
   justify-content: flex-start;
@@ -366,13 +368,13 @@ const CSS = `
 /* The timetable fills the viewport: it is the one screen that earns the width.
    Only the reading-heavy screens (tables, forms, pick lists) get a comfort cap. */
 .page { width: 100%; }
-.page--narrow { max-width: 960px; }
+.page--narrow { max-width: 1100px; }
 .page--moves { width: 100%; max-width: none; }
-/* Step 1 is a single focused column: width follows the stepper, not the viewport. */
 .page--step1 { max-width: none; }
 .flow {
-  width: fit-content;
-  max-width: min(100%, 620px);
+  width: 100%;
+  max-width: 560px;
+  margin: 0;
 }
 .flow .steps { width: auto; max-width: 100%; }
 .step1panel { width: 100%; }
@@ -397,17 +399,17 @@ const CSS = `
 .steps {
   display: flex; align-items: center; justify-content: center;
   gap: 0; width: 100%;
-  margin: 0; padding: 2px 0 4px;
+  margin: 0; padding: 0;
   background: transparent; border: 0;
 }
 .stepwrap { display: flex; align-items: center; flex: 0 0 auto; }
 .step {
   display: flex; align-items: center; gap: 8px;
   color: var(--ink-400);
-  padding: 5px 12px 5px 5px; border-radius: 999px;
+  padding: 7px 14px 7px 7px; border-radius: 999px;
 }
 .step b {
-  width: 30px; height: 30px; border-radius: 999px; flex: 0 0 30px;
+  width: 32px; height: 32px; border-radius: 999px; flex: 0 0 32px;
   display: inline-flex; align-items: center; justify-content: center;
   background: var(--white); border: 1.5px solid var(--line);
   color: var(--ink-400); font-size: 13.5px; font-weight: 700;
@@ -490,7 +492,12 @@ const CSS = `
 /* ---------- layout: content + confirm sidebar ---------- */
 .work { display: flex; align-items: flex-start; gap: 10px; width: 100%; min-width: 0; }
 .work__main { flex: 1 1 0%; min-width: 0; }
-.work__side { flex: 0 0 248px; width: 248px; max-width: 248px; position: sticky; top: 0; }
+.work__side {
+  flex: 0 0 var(--side-w, 248px);
+  width: var(--side-w, 248px);
+  max-width: var(--side-w, 248px);
+  position: sticky; top: 0;
+}
 
 /* ---------- week grid ---------- */
 /* overflow-x must stay auto at every width: with visible overflow the min-width table
@@ -812,18 +819,14 @@ const CSS = `
 .tbl__hrs { font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .tbl__act { vertical-align: middle; width: 26%; }
 .tbl__act-inner {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 12px; min-width: 0;
+  display: flex; flex-wrap: wrap; align-items: flex-start;
+  gap: 8px; min-width: 0;
 }
 .tbl__badges {
-  display: flex; flex-wrap: wrap; align-items: center;
-  gap: 6px; flex: 0 1 auto; min-width: 0; max-width: 240px;
+  display: flex; flex-direction: column; align-items: flex-start;
+  gap: 6px; flex: 1 1 8rem; min-width: 0;
 }
-.tbl__badges--stack {
-  flex-direction: column; align-items: flex-start; flex-wrap: nowrap;
-}
-.tbl__act-inner .btn { white-space: nowrap; flex: 0 0 auto; position: relative; z-index: 1; }
-.tbl__act-inner .pill { flex: 0 0 auto; }
+.tbl__act-inner .btn { white-space: nowrap; flex: 0 0 auto; }
 .colhead { display: inline-flex; align-items: center; gap: 6px; }
 .colhead::before { content: ""; width: 6px; height: 6px; border-radius: 999px; }
 .colhead--leave::before { background: var(--leave); }
@@ -881,7 +884,7 @@ const CSS = `
 .empty__s { font-size: 12px; color: var(--ink-500); margin: 4px 0 12px; }
 
 /* ---------- settings ---------- */
-.settings { max-width: 720px; }
+.settings { width: 100%; max-width: 880px; }
 .sec { margin-bottom: 18px; }
 .sec__head { display: flex; align-items: baseline; gap: 9px; margin-bottom: 9px; flex-wrap: wrap; }
 .sec__title { font-size: 12.5px; font-weight: 650; }
@@ -992,30 +995,52 @@ const CSS = `
 ------------------------------------ */
 
 @media (min-width: 1680px) and (min-height: 960px) {
-  .mvs__main { padding: 14px 20px 20px; }
-  .mvs { --cell-h: 74px; }
-  .work__side { flex-basis: 280px; width: 280px; }
-  .work { gap: 12px; }
+  .mvs { --cell-h: 74px; --side-w: 320px; font-size: 14px; }
+  .mvs__main { padding: 16px 28px 24px; }
+  .mvs.has-notch .mvs__main { padding-top: 28px; }
+  .mvs__notch .steps { padding: 16px 32px 18px; }
+  .work { gap: 16px; }
   .grid td { padding: 4px; }
   .cell { padding: 7px 10px; gap: 3px; }
-  .cell__count { font-size: 14px; }
-  .pg__title { font-size: 17px; }
-  .pip { width: 6px; height: 6px; }
-  .step { gap: 10px; }
-  .step b { width: 32px; height: 32px; flex-basis: 32px; font-size: 14px; }
-  .step__t { font-size: 14.5px; }
-  .step__arrow { width: 42px; margin: 0 12px; }
-}
-
-@media (min-width: 1920px) and (min-height: 1100px) {
-  .mvs { --cell-h: 84px; }
-  .mvs__main { padding: 18px 24px 24px; }
-  .work__side { flex-basis: 300px; width: 300px; }
-  .cell { padding: 9px 11px; }
   .cell__count { font-size: 15px; }
+  .cell__campus { font-size: 12px; }
+  .pg__title { font-size: 20px; }
+  .pg__sub { font-size: 14px; }
+  .pip { width: 6px; height: 6px; }
+  .chip { font-size: 12.5px; padding: 4px 10px; }
+  .needs { font-size: 10.5px; }
+  .step { gap: 10px; padding: 6px 14px 6px 6px; }
   .step b { width: 34px; height: 34px; flex-basis: 34px; font-size: 15px; }
   .step__t { font-size: 15px; }
+  .step__arrow { width: 42px; margin: 0 12px; }
+  .side__head, .side__body, .side__foot { padding: 12px 14px; }
+  .side__title { font-size: 15px; }
+  .side__match { font-size: 13px; }
+  .side__label { font-size: 11px; }
+  .pick { padding: 8px 10px; }
+  .pick__when { font-size: 14px; }
+  .pick__meta { font-size: 12.5px; }
+  .btn { font-size: 14px; padding: 10px 16px; }
+  .filters { padding: 9px 12px; }
+}
+
+@media (min-width: 1920px) and (min-height: 900px) {
+  .mvs { --cell-h: 88px; --side-w: 360px; font-size: 15px; }
+  .mvs__main { padding: 18px 32px 28px; }
+  .mvs.has-notch .mvs__main { padding-top: 32px; }
+  .mvs__notch .steps { padding: 18px 36px 20px; }
+  .cell { padding: 9px 12px; }
+  .cell__count { font-size: 16px; }
+  .pg__title { font-size: 22px; }
+  .pg__sub { font-size: 15px; }
+  .step b { width: 36px; height: 36px; flex-basis: 36px; font-size: 16px; }
+  .step__t { font-size: 16px; }
   .step__arrow { width: 48px; margin: 0 14px; }
+  .side__title { font-size: 16px; }
+  .side__match { font-size: 14px; }
+  .pick__when { font-size: 15px; }
+  .btn { font-size: 15px; padding: 11px 18px; }
+  .needs { font-size: 11px; }
 }
 
 @media (max-height: 800px) {
@@ -1031,8 +1056,11 @@ const CSS = `
   .step__arrow { width: 24px; margin: 0 6px; }
 }
 
-/* Below 1100px the sidebar stops competing with the grid for width and stacks under it,
-   full-bleed. align-items must become stretch or the column children shrink to content. */
+/* Below 1100px the confirm tray stacks under the grid so both keep full width. */
+@media (max-width: 1400px) {
+  .needs { white-space: normal; overflow: visible; text-overflow: unset; line-height: 1.15; }
+}
+
 @media (max-width: 1100px) {
   .work { flex-direction: column; align-items: stretch; }
   .work__main { width: 100%; }
@@ -1050,29 +1078,29 @@ const CSS = `
   .mvs { --cell-h: 64px; }
   .cell { padding: 6px 8px; }
   .grid th.grid__timehead, .grid__time { width: 56px; }
-  .mvs__nav { flex-basis: 180px; width: 180px; }
-  .mvs { --nav-w: 180px; }
 }
 
 @media (max-width: 900px) {
-  .mvs__nav { display: none; }
-  .mvs { --nav-w: 0px; }
-  .mvs__notch { left: 0; }
+  .mvs { font-size: 12.5px; }
   .mvs__main { padding: 14px 14px 96px; }
   .gridwrap { display: none; }
   .only-wide { display: none; }
   .only-narrow { display: block; }
-  .mvs__tabs { display: flex; }
   .lrow__when { flex-basis: 96px; }
   .pg__banner { gap: 4px; }
   .step__arrow { width: 22px; margin: 0 6px; }
-  .step b { width: 24px; height: 24px; flex-basis: 24px; font-size: 12px; }
+  .step b { width: 26px; height: 26px; flex-basis: 26px; font-size: 12px; }
   .step__t { font-size: 12.5px; }
   .settings { max-width: none; }
   .plfpick__body { align-items: stretch; }
+  .needs { white-space: normal; overflow: visible; text-overflow: unset; }
+  .step1panel .pickrow__main { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .step1panel .pickrow__dot { display: none; }
+  .tbl__act-inner { flex-direction: column; align-items: flex-start; }
 }
 
 @media (max-width: 560px) {
+  .mvs { font-size: 12px; }
   .mvs__bar { height: auto; min-height: var(--bar-h); padding: 8px 12px; flex-wrap: wrap; gap: 8px; }
   .mvs__brand { font-size: 14px; }
   .mvs__who-block { display: none; }
@@ -1112,6 +1140,7 @@ const CSS = `
 @media (min-width: 901px) { .mvs__tabs { display: none; } }
 
 .mvs__tabs {
+  display: none;
   gap: 6px; padding: 8px 12px; background: var(--white);
   border-bottom: 1px solid var(--line); overflow-x: auto; flex: 0 0 auto;
 }
@@ -1123,10 +1152,14 @@ const CAMPUS = {
     online: { short: "Online", name: "Online" },
 };
 const CAMPUS_KEYS = ["gp", "kg", "online"];
-/** Mock User.PrimaryCampus for You / Maths PLFs. Join grid defaults here; GP/KG/Online stay switchable. */
+/** Mock User.PrimaryCampus. Join grid defaults here; GP/KG/Online stay switchable. */
 const PRIMARY_CAMPUS = "gp";
 const DEFAULT_CAPS = { gp: 10, kg: 3, online: 10 };
-/** The roster's discipline. needsDiscipline is true when nobody here holds it. */
+/**
+ * Roster primary group. Badge/filter copy uses `short` from ShiftOverrideHelper
+ * ExactDisciplineLabels. Maths & Physical Sciences maps to "Maths & Science".
+ * Keep "No " on the chip so it cannot read as "this hour is maths".
+ */
 const DISCIPLINE = { code: "MATH", short: "Maths & Science", full: "STIMulate Maths and Physical Sciences" };
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
 const TIMES = [
@@ -1166,7 +1199,7 @@ function slot(day, timeKey, campus, people) {
  * swap in at those same day+times. No "all campuses" layer yet.
  *
  * Demo cases:
- * - Wed 12:00 GP is well staffed but has nobody from the roster discipline.
+ * - Wed 12:00 GP is well staffed but has nobody from the roster primary group.
  * - Thu 2:00 KG holds 13 people against a Kelvin Grove capacity of 3.
  * - KG hours otherwise sit inside a capacity of 3.
  */
@@ -1451,7 +1484,7 @@ function peopleOf(s, applied) {
         if (applied.leave.indexOf(s.id) >= 0)
             list = list.filter((p) => p.name !== "You");
         if (applied.join.indexOf(s.id) >= 0)
-            list = list.concat([{ name: "You", disc: "MATH" }]);
+            list = list.concat([{ name: "You", disc: DISCIPLINE.code }]);
     }
     return list;
 }
@@ -1474,10 +1507,9 @@ function Pips(props) {
 }
 function NeedsBadge(props) {
     const muted = props.muted ? " needs--muted" : "";
-    const label = props.compact ? "No " + DISCIPLINE.code : "No " + DISCIPLINE.short;
     return (<Tip text={"No " + DISCIPLINE.short + " facilitator here"}>
       <span className={"needs" + muted}>
-        <Caution /> {label}
+        <Caution /> {"No " + DISCIPLINE.short}
       </span>
     </Tip>);
 }
@@ -1955,17 +1987,17 @@ function MoveFlow(props) {
         const allMine = SLOTS.filter((s) => MY_SHIFTS.indexOf(s.id) >= 0);
         const noRoster = allMine.length === 0;
         return (<div className="page page--step1">
-        <div className="flow">
         <div className="pg__banner">
         <div className="pg__head">
           <h1 className="pg__title">{props.self ? "Move a Shift" : "Move a Shift for a PLF"}</h1>
-          <p className="pg__sub">
+        </div>
+        </div>
+        <div className="flow">
+        <p className="pg__sub" style={{ marginBottom: 12 }}>
             {props.self
                 ? "Move hours you cannot make to other hours this week. Your total hours stay the same."
-                : "Move hours for a PLF on their discipline roster. Their total hours stay the same."}
-          </p>
-        </div>
-        </div>
+                : "Move hours for a PLF. Their total hours stay the same."}
+        </p>
 
         <div className="step1panel">
         {!props.self ? (<div className="step1panel__who">
@@ -2132,7 +2164,7 @@ function MoveStatusBadges(props) {
           Over capacity
         </span>);
     }
-    return (<div className={"tbl__badges" + (badges.length > 2 ? " tbl__badges--stack" : "")}>
+    return (<div className="tbl__badges">
       {badges}
     </div>);
 }
@@ -2297,20 +2329,11 @@ function Settings(props) {
       </div>
     </div>);
 }
-function ReportAbsenceStub(props) {
-    return (<div>
+function ReportAbsenceStub() {
+    return (<div className="page page--narrow">
       <div className="pg__head">
         <h1 className="pg__title">Report an Absence</h1>
-        <p className="pg__sub">Existing flow, unchanged in Phase 1. Shown here only to place Move a Shift beside it.</p>
-      </div>
-      <div className="card">
-        <div className="card__body">
-          <div className="note">
-            Reporting an absence tells the team you will not be there and leaves the hour empty. If you can still work,
-            but at a different time, <button type="button" className="btn btn--link" onClick={props.onMove}>move the shift</button>{" "}
-            instead so the hour stays covered. Hours you have joined through a move cannot be marked absent until an SSP reverses the move.
-          </div>
-        </div>
+        <p className="pg__sub">The existing Report an Absence page will be here.</p>
       </div>
     </div>);
 }
@@ -2328,7 +2351,7 @@ function AbsenceReallocationPhase1Prototype() {
     useEffect(() => {
         if (!toast)
             return;
-        const t = setTimeout(() => setToast(null), 3600);
+        const t = setTimeout(() => setToast(null), 5000);
         return () => clearTimeout(t);
     }, [toast]);
     const isPlf = role === "plf";
@@ -2366,11 +2389,7 @@ function AbsenceReallocationPhase1Prototype() {
             status: "active",
         };
         setMoves([next].concat(moves));
-        setToast("Move applied. " +
-            leave.length +
-            " " +
-            plural(leave.length, "hour", "hours") +
-            " moved.");
+        setToast("Move applied. This mock has reset so you can try another move.");
     }
     const roleTitle = role === "admin" ? "Administrator" : role === "ssp" ? "Duty Host" : "PLF";
     const onMoveFlow = current === "move" || current === "assign";
@@ -2427,7 +2446,7 @@ function AbsenceReallocationPhase1Prototype() {
         </nav>
 
         <main className="mvs__main">
-          {current === "move" ? (<MoveFlow self who="You" role={role} caps={caps} showExact={exactFor} onApplied={(leave, join) => applyMove("You", leave, join, "Self")}/>) : current === "absence" ? (<ReportAbsenceStub onMove={() => setScreen("move")}/>) : current === "assign" ? (<MoveFlow self={false} who={who} role={role} caps={caps} showExact onPickWho={setWho} onApplied={(leave, join) => {
+          {current === "move" ? (<MoveFlow self who="You" role={role} caps={caps} showExact={exactFor} onApplied={(leave, join) => applyMove("You", leave, join, "Self")}/>) : current === "absence" ? (<ReportAbsenceStub />) : current === "assign" ? (<MoveFlow self={false} who={who} role={role} caps={caps} showExact onPickWho={setWho} onApplied={(leave, join) => {
                 applyMove(who, leave, join, role === "admin" ? "Jack A (Admin)" : "Jack A (SSP)");
                 setScreen("active");
             }}/>) : current === "settings" ? (<Settings caps={caps} onCaps={setCaps} showExact={showExact} onShowExact={setShowExact}/>) : (<ActiveMoves moves={moves} onAssign={() => setScreen("assign")} onCancel={(id) => {
