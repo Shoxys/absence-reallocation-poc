@@ -204,7 +204,7 @@ function Callout({ tone = "info", title, children }) {
  * After UX edits: npm run build in the POC repo, then push, then update plan + rule.
  *
  * WHAT CHANGED IN THIS REVISION
- * 1. Ship skin locked: blue capacity cells, people pips, heat on short-staffed hours.
+ * 1. Ship skin locked: blue capacity cells, people pips, heat border on discipline gaps.
  *    The 14-skin design lab and the confirm-layout A/B are gone. Right sidebar only.
  * 2. Full-screen application, not a framed mock. Real CSS with media queries, so the
  *    layout responds to the actual viewport instead of a Desktop/Mobile toggle.
@@ -213,6 +213,8 @@ function Callout({ tone = "info", title, children }) {
  * 4. Naming: "Move a Shift", "Active Shift Moves", "Move a Shift for a PLF".
  *    No "absence", no "swap", no "override" in user-facing copy.
  * 5. Admin-only "Move a Shift Settings" screen. SSP sees the two operational screens only.
+ * 6. Step chrome is unboxed under the title. Filters dock to the timetable as one
+ *    board. Arrows carry the progress line. Quiet check-pops on select / confirm.
  *
  * EXPORT CONTRACT (build-from-canvas.mjs)
  * - Keep the default export name AbsenceReallocationPhase1Prototype.
@@ -233,6 +235,7 @@ const CSS = `
   --blue-200: #C7E0F5;
   --blue-100: #DCECFA;
   --blue-50:  #F2F8FD;
+  --heat-line: #4690D4; /* mid blue for discipline heat — clear against pastel fills, not near-black */
 
   /* Action colours. Blue carries capacity information only; green means go, red means leaving. */
   --go:        #2E7D3A;
@@ -255,10 +258,15 @@ const CSS = `
   --amber-fill: #FFF7ED;
   --amber-line: #F5C89A;
 
-  --cell-h: 60px;
+  --cell-h: 68px;
+  --bar-h: 60px;
+  --nav-w: 220px;
+  --stim-header: #114A81;
+  --stim-nav: #2E3846;
 
   display: flex;
   flex-direction: column;
+  position: relative;
   width: 100%;
   min-height: 100vh;
   min-height: 100dvh;
@@ -269,20 +277,26 @@ const CSS = `
   background: var(--surface);
 }
 
-/* ---------- app chrome ---------- */
+/* ---------- app chrome (STIMulate UserLayout proportions) ---------- */
 .mvs__bar {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 0 16px;
-  height: 40px;
-  background: var(--blue-800);
+  padding: 0 14px 0 10px;
+  height: var(--bar-h);
+  background: var(--stim-header);
   color: var(--white);
+  position: relative;
+  z-index: 40;
+  box-shadow: 0 2px 2px 0 rgba(0,0,0,.14), 0 1px 5px 0 rgba(0,0,0,.12), 0 3px 1px -2px rgba(0,0,0,.2);
 }
-.mvs__brand { font-weight: 600; font-size: 13px; letter-spacing: .1px; }
+.mvs__branding { display: flex; align-items: center; height: 40px; flex: 0 0 auto; }
+.mvs__brand { font-weight: 600; font-size: 18px; letter-spacing: 0; color: #f0f0f0; }
 .mvs__spacer { flex: 1 1 auto; }
-.mvs__who { font-size: 12px; color: rgba(255,255,255,.85); }
+.mvs__who-block { text-align: right; line-height: 1.15; flex: 0 0 auto; }
+.mvs__who-name { font-size: 16px; font-weight: 700; color: #fff; }
+.mvs__who-role { font-size: 13px; color: rgba(255,255,255,.88); }
 .mvs__demo {
   display: flex; align-items: center; gap: 6px;
   padding: 3px 4px 3px 8px; border-radius: 999px;
@@ -294,38 +308,74 @@ const CSS = `
   padding: 3px 9px; font: inherit; font-size: 11px; font-weight: 600;
   background: transparent; color: rgba(255,255,255,.8);
 }
-.mvs__demo button[data-on="1"] { background: var(--white); color: var(--blue-800); }
+.mvs__demo button[data-on="1"] { background: var(--white); color: var(--stim-header); }
+
+/* Compact iPhone-style notch: hangs from the navy bar over the title row. */
+.mvs__notch {
+  position: absolute;
+  top: var(--bar-h);
+  left: var(--nav-w);
+  right: 0;
+  height: 0;
+  display: flex; justify-content: center;
+  z-index: 36;
+  pointer-events: none;
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+.mvs__notch .steps {
+  pointer-events: auto;
+  width: auto;
+  background: #fff;
+  border-radius: 0 0 20px 20px;
+  box-shadow: 0 8px 20px rgba(17,74,129,.16);
+  padding: 8px 20px 11px;
+}
+.mvs.has-notch .mvs__main { padding-top: 10px; }
+.mvs.has-notch .pg__banner {
+  min-height: 44px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+}
 
 .mvs__body { flex: 1 1 auto; display: flex; min-height: 0; }
 .mvs__nav {
-  flex: 0 0 168px; width: 168px;
-  background: var(--blue-900);
-  padding: 12px 0;
+  flex: 0 0 var(--nav-w); width: var(--nav-w);
+  background: var(--stim-nav);
+  padding: 8px 0;
   overflow-y: auto;
 }
 .mvs__navhead {
-  padding: 4px 16px 8px; font-size: 10px; font-weight: 700;
-  letter-spacing: .6px; color: rgba(255,255,255,.5);
+  padding: 10px 16px 6px; font-size: 11px; font-weight: 700;
+  letter-spacing: .4px; color: #a7b1c2; text-transform: none;
 }
 .mvs__navitem {
   display: block; width: 100%; text-align: left;
-  padding: 8px 16px; font: inherit; font-size: 12.5px;
-  color: rgba(255,255,255,.72); background: transparent;
-  border: 0; border-left: 3px solid transparent; cursor: pointer;
+  padding: 0 16px; height: 40px; line-height: 40px;
+  font: inherit; font-size: 13px;
+  color: #a7b1c2; background: transparent;
+  border: 0; border-left: 4px solid transparent; cursor: pointer;
 }
-.mvs__navitem:hover { color: var(--white); background: rgba(255,255,255,.06); }
+.mvs__navitem:hover { color: #fff; border-left-color: #2abeee; }
 .mvs__navitem[data-on="1"] {
-  color: var(--white); background: rgba(31,111,191,.34); border-left-color: var(--blue-400); font-weight: 600;
+  color: var(--stim-nav); background: #fff; border-left-color: #2abeee; font-weight: 600;
 }
-.mvs__main { flex: 1 1 auto; min-width: 0; overflow-y: auto; padding: 10px 14px 12px; }
+.mvs__main { flex: 1 1 auto; min-width: 0; overflow-x: hidden; overflow-y: auto; padding: 16px 20px 16px; }
 /* The timetable fills the viewport: it is the one screen that earns the width.
    Only the reading-heavy screens (tables, forms, pick lists) get a comfort cap. */
 .page { width: 100%; }
 .page--narrow { max-width: 960px; }
-/* Step 1 is a single focused column: the rail must not span three times the list it labels. */
-.page--step1 { max-width: 720px; }
-/* Shared column for stepper, PLF picker, and pick list — one vertical anchor. */
-.flow { width: 100%; max-width: 720px; }
+.page--moves { width: 100%; max-width: none; }
+/* Step 1 is a single focused column: width follows the stepper, not the viewport. */
+.page--step1 { max-width: none; }
+.flow {
+  width: fit-content;
+  max-width: min(100%, 620px);
+}
+.flow .steps { width: auto; max-width: 100%; }
+.step1panel { width: 100%; }
 
 /* ---------- page furniture ---------- */
 .pg__title { margin: 0; font-size: 16px; font-weight: 650; }
@@ -334,7 +384,7 @@ const CSS = `
 .pg__head--row { display: flex; align-items: center; gap: 12px; }
 .pg__banner {
   display: flex; flex-direction: column; align-items: stretch;
-  gap: 10px; margin-bottom: 12px;
+  gap: 8px; margin-bottom: 14px;
 }
 .pg__banner .pg__head { margin-bottom: 0; }
 .btn--back {
@@ -342,34 +392,46 @@ const CSS = `
   padding: 6px 10px; flex: 0 0 auto;
 }
 
-/* Full-width step banner under the title. Laptop-sized by default. */
+/* Progress track sits under the title, on the page — not in a card, so it
+   cannot collide with the board. Current step is the pill; arrows carry the line. */
 .steps {
   display: flex; align-items: center; justify-content: center;
   gap: 0; width: 100%;
-  margin: 0; padding: 10px 20px;
-  border: 1px solid var(--line); border-radius: 8px; background: var(--white);
-  overflow: visible;
+  margin: 0; padding: 2px 0 4px;
+  background: transparent; border: 0;
 }
 .stepwrap { display: flex; align-items: center; flex: 0 0 auto; }
-.step { display: flex; align-items: center; gap: 8px; color: var(--ink-400); }
+.step {
+  display: flex; align-items: center; gap: 8px;
+  color: var(--ink-400);
+  padding: 5px 12px 5px 5px; border-radius: 999px;
+}
 .step b {
   width: 30px; height: 30px; border-radius: 999px; flex: 0 0 30px;
   display: inline-flex; align-items: center; justify-content: center;
-  background: var(--surface); border: 1.5px solid var(--line);
-  color: var(--ink-400); font-size: 14px; font-weight: 700;
+  background: var(--white); border: 1.5px solid var(--line);
+  color: var(--ink-400); font-size: 13.5px; font-weight: 700;
 }
-.step__t { display: inline; font-size: 13.5px; white-space: nowrap; font-weight: 500; }
-.step[data-on="1"] { color: var(--blue-800); font-weight: 650; }
+.step__t { display: inline; font-size: 14px; white-space: nowrap; font-weight: 500; }
+.step[data-on="1"] {
+  color: var(--blue-800); font-weight: 650;
+  background: var(--blue-50);
+  box-shadow: inset 0 0 0 1px var(--blue-200);
+}
 .step[data-on="1"] b {
   background: var(--blue-600); border-color: var(--blue-600); color: var(--white);
-  box-shadow: 0 0 0 3px var(--blue-100);
 }
-.step[data-on="1"] .step__t { display: inline; color: var(--blue-800); }
+.step[data-on="1"] .step__t { display: inline; color: var(--blue-800); font-weight: 700; }
 .step[data-done="1"] { color: var(--ink-500); }
 .step[data-done="1"] b {
-  background: var(--go-fill); border-color: var(--go-line); color: var(--go);
+  background: var(--go); border-color: var(--go); color: var(--white);
 }
-.step__arrow { color: var(--ink-400); flex: 0 0 auto; margin: 0 12px; width: 15px; height: 15px; opacity: .55; }
+.step__arrow {
+  flex: 0 0 auto; margin: 0 10px; width: 34px; height: 12px;
+  color: var(--ink-400); opacity: .4;
+}
+.step__arrow[data-done="1"] { color: var(--go); opacity: 1; }
+.flow .steps { justify-content: flex-start; padding-left: 0; }
 
 .note {
   border: 1px solid var(--blue-200); background: var(--blue-50);
@@ -378,11 +440,21 @@ const CSS = `
 .note--warn { border-color: var(--amber-line); background: var(--amber-fill); color: var(--amber); }
 .note--quiet { border-color: var(--line); background: var(--white); color: var(--ink-500); }
 
+/* ---------- board: filters + timetable as one surface ---------- */
+.board {
+  border: 1px solid var(--line); border-radius: 8px; background: var(--white);
+  overflow: hidden;
+}
+.board .gridwrap { border: 0; border-radius: 0; }
+.board .list { padding: 8px; }
+.board .gridwrap + .only-narrow .list { border-top: 1px solid var(--line); }
+
 /* ---------- filters ---------- */
 .filters {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  padding: 6px 9px; margin-bottom: 8px;
-  border: 1px solid var(--line); border-radius: 8px; background: var(--white);
+  padding: 7px 10px; margin: 0;
+  border: 0; border-bottom: 1px solid var(--line); border-radius: 0;
+  background: var(--white);
 }
 .filters__label {
   display: inline-flex; align-items: center; gap: 6px;
@@ -447,30 +519,35 @@ const CSS = `
 /* Fixed height on every cell: a shorter cell reads as a shorter session, which is not a thing. */
 .cell {
   position: relative; width: 100%; height: var(--cell-h);
-  display: flex; flex-direction: column; gap: 3px; justify-content: center;
-  padding: 6px 8px; border-radius: 6px; text-align: left;
+  display: flex; flex-direction: column; gap: 4px; justify-content: center;
+  padding: 7px 8px; border-radius: 6px; text-align: left;
   border: 1px solid var(--line); background: var(--white);
-  font: inherit; color: var(--ink-900); cursor: default; overflow: hidden;
+  font: inherit; color: var(--ink-900); cursor: default; overflow: visible;
 }
 .cell--click { cursor: pointer; }
 .cell--click:hover { border-color: var(--blue-400); }
 /* no session: a quiet gap, so the eye lands on real hours */
 .cell--empty { height: var(--cell-h); border: 1px dashed var(--line); background: var(--surface); }
 
-/* Capacity is the ONLY thing blue says. Heat = a bolder border on short-staffed hours. */
-.cell--needs { background: var(--blue-100); border: 2px solid var(--blue-400); }
+/* Capacity blue = short-staffed hours. Heat = emphasis border when the roster discipline is missing. */
+.cell--needs { background: var(--blue-100); border: 1px solid var(--blue-200); }
 .cell--avail { background: var(--white); border-color: var(--line); }
 .cell--cov   { background: var(--white); border-color: var(--line); }
 .cell--full  { background: var(--surface); border-color: var(--line); opacity: .58; }
 .cell--over  { background: var(--surface); border-color: var(--line); opacity: .58; }
+.cell--heat  { border: 2px solid var(--heat-line); }
+.cell--click.cell--heat:hover { border-color: var(--blue-600); }
 
 /* Selection speaks in green (go) and red (leaving), never in another blue. */
 .cell--mine    { background: var(--white); border: 1.5px dashed var(--ink-400); }
 .cell--leaving { background: var(--blue-800); border: 2px solid var(--blue-800); }
 .cell--join    { background: var(--go-fill); border: 2px solid var(--go); box-shadow: 0 0 0 3px rgba(46,125,58,.16); }
 
-.cell__top { display: flex; align-items: center; gap: 6px; }
-.cell__count { font-size: 13px; font-weight: 700; color: var(--ink-900); }
+.cell__top { display: flex; align-items: center; gap: 5px; flex-wrap: nowrap; min-width: 0; }
+.cell__count { font-size: 13px; font-weight: 700; color: var(--ink-900); flex: 0 0 auto; }
+.cell__campus {
+  font-size: 11px; font-weight: 600; color: var(--ink-500); flex: 0 0 auto;
+}
 .cell__own { font-size: 12.5px; font-weight: 650; }
 .cell__own--mine { color: var(--ink-700); }
 .cell__own--leaving { color: #fff; }
@@ -502,7 +579,7 @@ const CSS = `
 .cell__all { margin: 2px 0 0; padding: 0; list-style: none; font-size: 11px; color: var(--ink-500); }
 .cell__all li { display: flex; gap: 5px; padding: 1px 0; }
 
-.pips { display: flex; gap: 2px; flex-wrap: wrap; align-items: center; }
+.pips { display: flex; gap: 2px; flex-wrap: nowrap; align-items: center; overflow: hidden; }
 .pip { width: 5px; height: 5px; border-radius: 1.5px; background: var(--line); }
 .pip[data-on="1"] { background: var(--blue-600); }
 .pip--over { background: var(--amber); }
@@ -519,8 +596,9 @@ const CSS = `
 .tag__x { border: 0; background: transparent; color: inherit; cursor: pointer; font: inherit; font-size: 12px; line-height: 1; padding: 0 0 0 2px; }
 
 .cell__foot {
-  min-height: 18px; display: flex; align-items: center; flex-shrink: 0;
+  min-height: 16px; display: flex; align-items: center; gap: 6px; flex-shrink: 0; min-width: 0;
 }
+.cell__foot .needs { flex: 0 1 auto; min-width: 0; }
 .needs {
   display: inline-flex; align-items: center; gap: 3px;
   max-width: 100%;
@@ -544,9 +622,15 @@ const CSS = `
   pointer-events: none; text-align: left;
 }
 .tip:hover .tip__b { opacity: 1; visibility: visible; }
+.tip:hover:has(.tip:hover) > .tip__b { opacity: 0; visibility: hidden; }
+.tip .tip { z-index: 45; }
+.tip .tip .tip__b { z-index: 46; }
 /* :focus-within alone kept the bubble open after a click; :focus-visible fires for keyboard only. */
 .tip:has(:focus-visible) .tip__b { opacity: 1; visibility: visible; }
 .tip:active .tip__b { opacity: 0; visibility: hidden; }
+.tbl__act .tip__b {
+  left: auto; right: 0; transform: none;
+}
 
 /* ---------- step 1: one panel (who + hours + actions) ---------- */
 .step1 { width: 100%; }
@@ -555,31 +639,33 @@ const CSS = `
   overflow: visible;
 }
 .step1panel__who {
-  padding: 14px 18px 13px;
+  padding: 12px 16px 11px;
   border-bottom: 1px solid var(--line);
   background: var(--surface);
   border-radius: 10px 10px 0 0;
 }
 .step1panel__hint {
-  padding: 11px 18px 8px;
+  padding: 10px 16px 7px;
   font-size: 11.5px; color: var(--ink-500);
 }
-.step1panel .list { gap: 0; }
+.step1panel .list { display: flex; flex-direction: column; gap: 0; padding: 0; }
 .step1panel .pickrow {
   border: 0; border-radius: 0; border-bottom: 1px solid var(--line);
-  padding: 12px 18px; background: transparent;
+  padding: 11px 16px; background: transparent;
 }
 .step1panel .pickrow:last-child { border-bottom: 0; }
-.step1panel .pickrow--on:last-child { border-bottom: 0; }
 .step1panel .pickrow:hover { background: var(--blue-50); border-color: var(--line); }
 .step1panel .pickrow--on {
   background: var(--blue-50);
+  border-color: var(--line);
   box-shadow: inset 3px 0 0 var(--blue-600);
-  border-bottom: 1px solid var(--line);
+}
+.step1panel .pickrow__main {
+  flex-direction: row; align-items: baseline; flex-wrap: wrap; gap: 0 10px;
 }
 .step1panel__foot {
   display: flex; align-items: center; gap: 12px;
-  padding: 12px 18px;
+  padding: 11px 16px;
   border-top: 1px solid var(--line);
   background: var(--surface);
   border-radius: 0 0 10px 10px;
@@ -601,8 +687,9 @@ const CSS = `
   display: inline-flex; align-items: center; justify-content: center;
 }
 .pickrow__box--on { border-color: var(--blue-600); background: var(--blue-600); color: #fff; }
-.pickrow__main { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.pickrow__main { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1 1 auto; }
 .pickrow__when { font-size: 12.5px; font-weight: 600; }
+.pickrow__dot { color: var(--ink-400); font-weight: 500; }
 .pickrow__where { font-size: 11.5px; color: var(--ink-500); }
 .step1foot { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
 .step1foot .btn { margin-left: auto; }
@@ -617,11 +704,13 @@ const CSS = `
 }
 .lrow--click { cursor: pointer; }
 .lrow--click:hover { border-color: var(--blue-400); }
-.lrow--needs { background: var(--blue-100); border-color: var(--blue-400); }
+.lrow--needs { background: var(--blue-100); border: 1px solid var(--blue-200); }
 .lrow--avail { background: var(--white); border-color: var(--line); }
 .lrow--cov   { background: var(--white); border-color: var(--line); }
 .lrow--full  { background: var(--surface); opacity: .6; }
 .lrow--over  { background: var(--surface); opacity: .6; }
+.lrow--heat  { border: 2px solid var(--heat-line); }
+.lrow--click.lrow--heat:hover { border-color: var(--blue-600); }
 .lrow--mine    { border: 1.5px dashed var(--ink-400); }
 .lrow--leaving { background: var(--blue-800); border: 2px solid var(--blue-800); }
 .lrow--join    { background: var(--go-fill); border: 2px solid var(--go); }
@@ -673,11 +762,14 @@ const CSS = `
 .pick__x:hover { color: var(--ink-900); }
 
 .btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   padding: 8px 13px; border-radius: 6px; border: 1px solid var(--line);
   background: var(--white); color: var(--ink-900);
   font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
+  transition: background-color .12s, border-color .12s, transform .1s, opacity .12s;
 }
 .btn:hover { border-color: var(--blue-400); }
+.btn:active:not(:disabled) { transform: scale(.98); }
 .btn--primary { background: var(--blue-600); border-color: var(--blue-600); color: var(--white); }
 .btn--primary:hover { background: var(--blue-800); border-color: var(--blue-800); }
 .btn--block { width: 100%; }
@@ -685,6 +777,7 @@ const CSS = `
 .btn:disabled:hover { border-color: var(--line); background: var(--white); color: var(--ink-900); }
 .btn--primary:disabled:hover { background: var(--blue-600); border-color: var(--blue-600); color: var(--white); }
 .btn--link { border: 0; background: transparent; color: var(--blue-600); text-decoration: underline; padding: 0; font-weight: 500; }
+.btn--link:active:not(:disabled) { transform: none; }
 
 /* ---------- tables and cards ---------- */
 .card { border: 1px solid var(--line); border-radius: 8px; background: var(--white); overflow: hidden; }
@@ -694,14 +787,14 @@ const CSS = `
 .card__sub { font-size: 11.5px; color: var(--ink-500); margin-top: 2px; }
 .card__body { padding: 13px; }
 
-.tblwrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-.tbl { width: 100%; border-collapse: collapse; table-layout: fixed; }
-.tbl col.c-plf   { width: 14%; }
-.tbl col.c-leave { width: 22%; }
-.tbl col.c-join  { width: 22%; }
+.tblwrap { overflow: visible; }
+.tbl { width: 100%; border-collapse: collapse; table-layout: auto; }
+.tbl col.c-plf   { width: 12%; }
+.tbl col.c-leave { width: 20%; }
+.tbl col.c-join  { width: 20%; }
 .tbl col.c-hrs   { width: 8%; }
 .tbl col.c-by    { width: 14%; }
-.tbl col.c-act   { width: 20%; }
+.tbl col.c-act   { width: 26%; }
 .tbl th {
   text-align: left; padding: 10px 14px; font-size: 10.5px; font-weight: 700;
   text-transform: uppercase; letter-spacing: .5px; color: var(--ink-400);
@@ -710,18 +803,27 @@ const CSS = `
 .tbl td {
   padding: 12px 14px; border-bottom: 1px solid var(--line);
   font-size: 12.5px; vertical-align: top;
-  overflow-wrap: break-word; word-break: break-word;
+  overflow-wrap: break-word; word-break: normal;
 }
 .tbl tbody tr:hover { background: var(--blue-50); }
 .tbl tr:last-child td { border-bottom: 0; }
 .tbl__plf { font-weight: 650; font-size: 13px; }
 .tbl__sub { font-size: 11px; color: var(--ink-500); margin-top: 2px; }
 .tbl__hrs { font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.tbl__act { text-align: right; vertical-align: middle; }
+.tbl__act { vertical-align: middle; width: 26%; }
 .tbl__act-inner {
-  display: flex; flex-wrap: wrap; align-items: center;
-  justify-content: flex-end; gap: 6px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; min-width: 0;
 }
+.tbl__badges {
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: 6px; flex: 0 1 auto; min-width: 0; max-width: 240px;
+}
+.tbl__badges--stack {
+  flex-direction: column; align-items: flex-start; flex-wrap: nowrap;
+}
+.tbl__act-inner .btn { white-space: nowrap; flex: 0 0 auto; position: relative; z-index: 1; }
+.tbl__act-inner .pill { flex: 0 0 auto; }
 .colhead { display: inline-flex; align-items: center; gap: 6px; }
 .colhead::before { content: ""; width: 6px; height: 6px; border-radius: 999px; }
 .colhead--leave::before { background: var(--leave); }
@@ -747,14 +849,17 @@ const CSS = `
 /* ---------- PLF picker ---------- */
 .plfpick { margin: 0; width: 100%; border: 0; background: transparent; overflow: visible; }
 .plfpick .card__body { padding: 0; }
-.plfpick__body { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.plfpick__body {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  justify-content: flex-start;
+}
 .plfpick__field {
-  flex: 1 1 240px; min-width: 180px; max-width: none;
+  flex: 0 1 auto; min-width: 0;
   display: flex; flex-direction: row; align-items: center; gap: 10px;
 }
 .plfpick__field .side__label { flex: 0 0 auto; margin: 0; }
 .plfpick__disc { flex: 0 0 auto; }
-.plfpick__inputwrap { position: relative; }
+.plfpick__inputwrap { position: relative; width: 220px; }
 .plfpick__inputwrap .search { width: 100%; flex: none; padding: 7px 11px; }
 .plfpick__body .tip { flex: 0 0 auto; }
 .plfpick__menu {
@@ -831,12 +936,52 @@ const CSS = `
 
 .toast {
   position: fixed; left: 50%; transform: translateX(-50%); bottom: 18px; z-index: 60;
-  display: flex; align-items: flex-start; gap: 10px; max-width: 460px;
+  display: flex; align-items: center; gap: 10px; max-width: 460px;
   padding: 11px 14px; border-radius: 8px;
   background: var(--ink-900); color: var(--white); font-size: 12.5px;
   box-shadow: 0 8px 26px rgba(0,0,0,.22);
+  animation: mvs-toast .22s ease-out;
+}
+.toast__ok {
+  flex: 0 0 22px; width: 22px; height: 22px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--go); color: #fff;
 }
 .toast button { border: 0; background: transparent; color: rgba(255,255,255,.65); cursor: pointer; font: inherit; font-size: 15px; line-height: 1; }
+
+.side__ready {
+  display: inline-flex; align-items: center; gap: 4px;
+  margin-left: 4px; color: var(--go-strong); font-weight: 600;
+}
+
+@keyframes mvs-pop {
+  from { transform: scale(.78); opacity: .35; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes mvs-rise {
+  from { transform: translateY(5px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes mvs-toast {
+  from { transform: translate(-50%, 8px); opacity: 0; }
+  to { transform: translate(-50%, 0); opacity: 1; }
+}
+.step[data-done="1"] b { animation: mvs-pop .2s ease-out; }
+.pickrow__box--on { animation: mvs-pop .16s ease-out; }
+.cell__badge { animation: mvs-pop .16s ease-out; }
+.pick--join { animation: mvs-rise .18s ease-out; }
+.side__ready { animation: mvs-rise .18s ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  .step[data-done="1"] b,
+  .pickrow__box--on,
+  .cell__badge,
+  .pick--join,
+  .side__ready,
+  .toast { animation: none; }
+  .btn { transition: none; }
+  .btn:active:not(:disabled) { transform: none; }
+}
 
 .only-wide { display: inline; }
 .only-narrow { display: none; }
@@ -848,7 +993,7 @@ const CSS = `
 
 @media (min-width: 1680px) and (min-height: 960px) {
   .mvs__main { padding: 14px 20px 20px; }
-  .mvs { --cell-h: 68px; }
+  .mvs { --cell-h: 74px; }
   .work__side { flex-basis: 280px; width: 280px; }
   .work { gap: 12px; }
   .grid td { padding: 4px; }
@@ -856,40 +1001,34 @@ const CSS = `
   .cell__count { font-size: 14px; }
   .pg__title { font-size: 17px; }
   .pip { width: 6px; height: 6px; }
-  .steps { padding: 14px 28px; border-radius: 10px; }
   .step { gap: 10px; }
-  .step b { width: 36px; height: 36px; flex-basis: 36px; font-size: 15px; border-width: 2px; }
-  .step[data-on="1"] b { box-shadow: 0 0 0 4px var(--blue-100); }
-  .step__t { font-size: 15px; }
-  .step__arrow { margin: 0 16px; width: 16px; height: 16px; }
+  .step b { width: 32px; height: 32px; flex-basis: 32px; font-size: 14px; }
+  .step__t { font-size: 14.5px; }
+  .step__arrow { width: 42px; margin: 0 12px; }
 }
 
 @media (min-width: 1920px) and (min-height: 1100px) {
-  .mvs { --cell-h: 80px; }
+  .mvs { --cell-h: 84px; }
   .mvs__main { padding: 18px 24px 24px; }
   .work__side { flex-basis: 300px; width: 300px; }
   .cell { padding: 9px 11px; }
   .cell__count { font-size: 15px; }
-  .steps { padding: 16px 32px; }
-  .step b { width: 40px; height: 40px; flex-basis: 40px; font-size: 17px; }
-  .step__t { font-size: 15.5px; }
-  .step__arrow { margin: 0 20px; width: 18px; height: 18px; }
+  .step b { width: 34px; height: 34px; flex-basis: 34px; font-size: 15px; }
+  .step__t { font-size: 15px; }
+  .step__arrow { width: 48px; margin: 0 14px; }
 }
 
 @media (max-height: 800px) {
-  .mvs { --cell-h: 54px; }
-  .mvs__bar { height: 36px; }
-  .mvs__main { padding: 8px 12px 10px; }
-  .pg__banner { margin-bottom: 6px; gap: 8px; }
-  .filters { margin-bottom: 6px; padding: 5px 8px; }
+  .mvs { --cell-h: 62px; }
+  .mvs__main { padding: 12px 16px 10px; }
+  .pg__banner { margin-bottom: 8px; gap: 4px; }
+  .filters { padding: 5px 8px; }
   .cell { padding: 4px 7px; }
   .cell__foot, .cell__meta { min-height: 16px; }
-  .steps { padding: 8px 16px; }
-  .step { gap: 8px; }
-  .step b { width: 26px; height: 26px; flex-basis: 26px; font-size: 12.5px; }
-  .step[data-on="1"] b { box-shadow: 0 0 0 3px var(--blue-100); }
+  .step { gap: 8px; padding: 3px 8px 3px 3px; }
+  .step b { width: 24px; height: 24px; flex-basis: 24px; font-size: 12px; }
   .step__t { font-size: 13px; }
-  .step__arrow { margin: 0 10px; width: 14px; height: 14px; }
+  .step__arrow { width: 24px; margin: 0 6px; }
 }
 
 /* Below 1100px the sidebar stops competing with the grid for width and stacks under it,
@@ -908,23 +1047,25 @@ const CSS = `
 }
 
 @media (max-width: 1100px) and (min-width: 901px) {
-  .mvs { --cell-h: 56px; }
-  .cell { padding: 4px 6px; }
+  .mvs { --cell-h: 64px; }
+  .cell { padding: 6px 8px; }
   .grid th.grid__timehead, .grid__time { width: 56px; }
-  .mvs__nav { flex-basis: 148px; width: 148px; }
+  .mvs__nav { flex-basis: 180px; width: 180px; }
+  .mvs { --nav-w: 180px; }
 }
 
 @media (max-width: 900px) {
   .mvs__nav { display: none; }
+  .mvs { --nav-w: 0px; }
+  .mvs__notch { left: 0; }
   .mvs__main { padding: 14px 14px 96px; }
   .gridwrap { display: none; }
   .only-wide { display: none; }
   .only-narrow { display: block; }
   .mvs__tabs { display: flex; }
   .lrow__when { flex-basis: 96px; }
-  .pg__banner { gap: 8px; }
-  .steps { padding: 8px 14px; }
-  .step__arrow { margin: 0 8px; width: 13px; height: 13px; }
+  .pg__banner { gap: 4px; }
+  .step__arrow { width: 22px; margin: 0 6px; }
   .step b { width: 24px; height: 24px; flex-basis: 24px; font-size: 12px; }
   .step__t { font-size: 12.5px; }
   .settings { max-width: none; }
@@ -932,17 +1073,17 @@ const CSS = `
 }
 
 @media (max-width: 560px) {
-  .mvs__bar { height: auto; padding: 7px 12px; flex-wrap: wrap; gap: 8px; }
-  .mvs__who { display: none; }
+  .mvs__bar { height: auto; min-height: var(--bar-h); padding: 8px 12px; flex-wrap: wrap; gap: 8px; }
+  .mvs__brand { font-size: 14px; }
+  .mvs__who-block { display: none; }
   .mvs__main { padding: 12px 11px 96px; }
   .pg__title { font-size: 16px; }
   .step1 { max-width: none; }
-  .flow { max-width: none; }
+  .flow { width: 100%; max-width: none; }
   /* phone: numbered rail only, the active label alone keeps its text */
-  .steps { padding: 6px 12px; }
   .step__t { display: none; }
   .step[data-on="1"] .step__t { display: inline; font-size: 12px; }
-  .step__arrow { margin: 0 6px; width: 12px; height: 12px; }
+  .step__arrow { width: 18px; margin: 0 4px; }
   .step b { width: 22px; height: 22px; flex-basis: 22px; font-size: 11.5px; }
   .filters { gap: 6px; padding: 8px; }
   .filters .chip { font-size: 11px; padding: 4px 8px; }
@@ -964,6 +1105,8 @@ const CSS = `
   .filters { flex-wrap: nowrap; overflow-x: auto; }
   .filters > * { flex: 0 0 auto; }
   .filters .search { flex: 1 0 150px; }
+  .tblwrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .tbl { min-width: 760px; }
 }
 
 @media (min-width: 901px) { .mvs__tabs { display: none; } }
@@ -979,6 +1122,9 @@ const CAMPUS = {
     kg: { short: "KG", name: "Kelvin Grove" },
     online: { short: "Online", name: "Online" },
 };
+const CAMPUS_KEYS = ["gp", "kg", "online"];
+/** Mock User.PrimaryCampus for You / Maths PLFs. Join grid defaults here; GP/KG/Online stay switchable. */
+const PRIMARY_CAMPUS = "gp";
 const DEFAULT_CAPS = { gp: 10, kg: 3, online: 10 };
 /** The roster's discipline. needsDiscipline is true when nobody here holds it. */
 const DISCIPLINE = { code: "MATH", short: "Maths & Science", full: "STIMulate Maths and Physical Sciences" };
@@ -1006,7 +1152,7 @@ function many(n, disc, prefix) {
 function slot(day, timeKey, campus, people) {
     const t = TIMES.filter((x) => x.key === timeKey)[0];
     return {
-        id: day.toLowerCase() + "-" + timeKey,
+        id: day.toLowerCase() + "-" + timeKey + "-" + campus,
         day,
         timeKey,
         start: t ? t.label : timeKey,
@@ -1015,10 +1161,14 @@ function slot(day, timeKey, campus, people) {
     };
 }
 /**
- * Mock week. Tuned so the demo carries the three cases that matter:
- * - Wed 12:00 GP is well staffed but has nobody from the roster discipline (item 4).
- * - Thu 2:00 KG holds 13 people against a Kelvin Grove capacity of 3 (legacy over-capacity).
- * - Kelvin Grove hours otherwise sit inside a capacity of 3, so small caps read correctly.
+ * GP and KG run at the same clock times (real timetable stacks hubs in one cell).
+ * The join grid is one campus at a time: GP fills the week by default; KG / Online
+ * swap in at those same day+times. No "all campuses" layer yet.
+ *
+ * Demo cases:
+ * - Wed 12:00 GP is well staffed but has nobody from the roster discipline.
+ * - Thu 2:00 KG holds 13 people against a Kelvin Grove capacity of 3.
+ * - KG hours otherwise sit inside a capacity of 3.
  */
 const SLOTS = [
     slot("Mon", "10", "gp", [
@@ -1033,8 +1183,11 @@ const SLOTS = [
         { name: "Casey Wu", disc: "SCI" },
         { name: "Avery Cole", disc: "SCI" },
     ]),
-    slot("Mon", "12", "kg", [{ name: "Noor H", disc: "MATH" }]),
-    slot("Mon", "13", "kg", []),
+    slot("Mon", "12", "gp", [
+        { name: "Casey Wu", disc: "SCI" },
+        { name: "Blake Tran", disc: "MATH" },
+    ]),
+    slot("Mon", "13", "gp", []),
     slot("Mon", "14", "gp", [
         { name: "You", disc: "MATH" },
         { name: "Olivia D", disc: "SCI" },
@@ -1049,16 +1202,22 @@ const SLOTS = [
         { name: "Zoe D", disc: "MATH" },
         { name: "Hannah W", disc: "ENG" },
     ]),
-    slot("Tue", "10", "kg", [
+    slot("Tue", "10", "gp", [
         { name: "Hamid A", disc: "SCI" },
         { name: "Nathaniel R", disc: "MATH" },
+        { name: "Bavitha G", disc: "IT" },
+        { name: "Duncan S", disc: "ENG" },
     ]),
-    slot("Tue", "11", "kg", [
+    slot("Tue", "11", "gp", [
         { name: "Hamid A", disc: "SCI" },
         { name: "Nathaniel R", disc: "MATH" },
         { name: "Haritha G", disc: "ENG" },
     ]),
     slot("Tue", "12", "gp", []),
+    slot("Tue", "13", "gp", [
+        { name: "Marcus B", disc: "SCI" },
+        { name: "Tia L", disc: "MATH" },
+    ]),
     slot("Tue", "14", "gp", many(10, "MATH", "Fac")),
     slot("Tue", "15", "gp", many(9, "SCI", "Fac")),
     slot("Wed", "10", "gp", many(7, "MATH", "Staff")),
@@ -1080,29 +1239,48 @@ const SLOTS = [
         { name: "Ivy Chan", disc: "IT" },
         { name: "Robin Shaw", disc: "SCI" },
     ]),
-    slot("Wed", "14", "online", [
+    slot("Wed", "14", "gp", [
         { name: "Jenifer N", disc: "MATH" },
         { name: "Riley C", disc: "SCI" },
         { name: "Chelsea H", disc: "SCI" },
         { name: "Louise M", disc: "MATH" },
     ]),
-    slot("Thu", "10", "kg", [
-        { name: "You", disc: "MATH" },
-        { name: "Rocika W", disc: "SCI" },
-        { name: "Malik T", disc: "SCI" },
+    slot("Wed", "15", "gp", [
+        { name: "Jenifer N", disc: "MATH" },
+        { name: "Riley C", disc: "SCI" },
     ]),
-    slot("Thu", "11", "kg", [
-        { name: "You", disc: "MATH" },
-        { name: "Rocika W", disc: "SCI" },
+    slot("Thu", "10", "gp", [
+        { name: "Sophia S", disc: "MATH" },
+        { name: "Daisy K", disc: "SCI" },
+        { name: "Brandon L", disc: "ENG" },
     ]),
-    slot("Thu", "12", "kg", []),
-    slot("Thu", "14", "kg", many(13, "MATH", "Fac")),
-    slot("Thu", "15", "kg", many(4, "SCI", "Fac")),
-    slot("Fri", "12", "online", [
-        { name: "Kate N", disc: "SCI" },
-        { name: "Amber J", disc: "SCI" },
+    slot("Thu", "11", "gp", [
+        { name: "Sophia S", disc: "MATH" },
+        { name: "Daisy K", disc: "SCI" },
     ]),
-    slot("Fri", "13", "online", [{ name: "Kate N", disc: "SCI" }]),
+    slot("Thu", "12", "gp", []),
+    slot("Thu", "13", "gp", [
+        { name: "Sophia S", disc: "MATH" },
+        { name: "Daisy K", disc: "SCI" },
+        { name: "Brandon L", disc: "ENG" },
+    ]),
+    slot("Thu", "14", "gp", many(8, "MATH", "GP")),
+    slot("Thu", "15", "gp", many(6, "SCI", "GP")),
+    slot("Fri", "10", "gp", [
+        { name: "Ada P", disc: "MATH" },
+        { name: "Sean D", disc: "SCI" },
+        { name: "Nia F", disc: "SCI" },
+        { name: "Owen R", disc: "ENG" },
+    ]),
+    slot("Fri", "11", "gp", [
+        { name: "Ada P", disc: "MATH" },
+        { name: "Sean D", disc: "SCI" },
+    ]),
+    slot("Fri", "12", "gp", [
+        { name: "Ada P", disc: "MATH" },
+        { name: "Felix M", disc: "MATH" },
+    ]),
+    slot("Fri", "13", "gp", [{ name: "Sean D", disc: "SCI" }]),
     slot("Fri", "14", "gp", [
         { name: "Felix M", disc: "MATH" },
         { name: "Mason H", disc: "SCI" },
@@ -1115,31 +1293,64 @@ const SLOTS = [
         { name: "Mason H", disc: "SCI" },
         { name: "Iram M", disc: "IT" },
     ]),
-    slot("Tue", "13", "gp", [
-        { name: "Marcus B", disc: "SCI" },
-        { name: "Tia L", disc: "MATH" },
+    slot("Mon", "10", "kg", [
+        { name: "Olivia D", disc: "SCI" },
+        { name: "Zoe D", disc: "MATH" },
+    ]),
+    slot("Mon", "11", "kg", [{ name: "Olivia D", disc: "SCI" }]),
+    slot("Mon", "12", "kg", [{ name: "Noor H", disc: "MATH" }]),
+    slot("Mon", "13", "kg", []),
+    slot("Mon", "14", "kg", [{ name: "Sandi C", disc: "ENG" }]),
+    slot("Mon", "15", "kg", []),
+    slot("Tue", "10", "kg", [
+        { name: "Hamid A", disc: "SCI" },
+        { name: "Nathaniel R", disc: "MATH" },
+    ]),
+    slot("Tue", "11", "kg", [
+        { name: "Hamid A", disc: "SCI" },
+        { name: "Nathaniel R", disc: "MATH" },
+        { name: "Haritha G", disc: "ENG" },
+    ]),
+    slot("Tue", "12", "kg", []),
+    slot("Tue", "14", "kg", [{ name: "Noor H", disc: "MATH" }]),
+    slot("Wed", "10", "kg", [{ name: "Sandi C", disc: "ENG" }]),
+    slot("Wed", "12", "kg", [
+        { name: "Olivia D", disc: "SCI" },
+        { name: "Zoe D", disc: "MATH" },
+    ]),
+    slot("Wed", "14", "kg", []),
+    slot("Thu", "10", "kg", [
+        { name: "You", disc: "MATH" },
+        { name: "Rocika W", disc: "SCI" },
+        { name: "Malik T", disc: "SCI" },
+    ]),
+    slot("Thu", "11", "kg", [
+        { name: "You", disc: "MATH" },
+        { name: "Rocika W", disc: "SCI" },
+    ]),
+    slot("Thu", "12", "kg", []),
+    slot("Thu", "13", "kg", [{ name: "Malik T", disc: "SCI" }]),
+    slot("Thu", "14", "kg", many(13, "MATH", "Fac")),
+    slot("Thu", "15", "kg", many(4, "SCI", "Fac")),
+    slot("Fri", "10", "kg", [{ name: "Sandi C", disc: "ENG" }]),
+    slot("Fri", "12", "kg", []),
+    slot("Wed", "14", "online", [
+        { name: "Jenifer N", disc: "MATH" },
+        { name: "Riley C", disc: "SCI" },
+        { name: "Chelsea H", disc: "SCI" },
+        { name: "Louise M", disc: "MATH" },
     ]),
     slot("Wed", "15", "online", [
         { name: "Jenifer N", disc: "MATH" },
         { name: "Riley C", disc: "SCI" },
     ]),
-    slot("Thu", "13", "gp", [
-        { name: "Sophia S", disc: "MATH" },
-        { name: "Daisy K", disc: "SCI" },
-        { name: "Brandon L", disc: "ENG" },
+    slot("Fri", "12", "online", [
+        { name: "Kate N", disc: "SCI" },
+        { name: "Amber J", disc: "SCI" },
     ]),
-    slot("Fri", "10", "gp", [
-        { name: "Ada P", disc: "MATH" },
-        { name: "Sean D", disc: "SCI" },
-        { name: "Nia F", disc: "SCI" },
-        { name: "Owen R", disc: "ENG" },
-    ]),
-    slot("Fri", "11", "gp", [
-        { name: "Ada P", disc: "MATH" },
-        { name: "Sean D", disc: "SCI" },
-    ]),
+    slot("Fri", "13", "online", [{ name: "Kate N", disc: "SCI" }]),
 ];
-const MY_SHIFTS = ["mon-14", "mon-15", "thu-10", "thu-11"];
+const MY_SHIFTS = ["mon-14-gp", "mon-15-gp", "thu-10-kg", "thu-11-kg"];
 const SEED_MOVES = [
     {
         id: 1,
@@ -1263,18 +1474,22 @@ function Pips(props) {
 }
 function NeedsBadge(props) {
     const muted = props.muted ? " needs--muted" : "";
-    return (<span className={"needs" + muted} title={"No " + DISCIPLINE.short + " facilitator here"}>
-      <Caution /> {props.short ? DISCIPLINE.short : "No " + DISCIPLINE.short}
-    </span>);
+    const label = props.compact ? "No " + DISCIPLINE.code : "No " + DISCIPLINE.short;
+    return (<Tip text={"No " + DISCIPLINE.short + " facilitator here"}>
+      <span className={"needs" + muted}>
+        <Caution /> {label}
+      </span>
+    </Tip>);
 }
 function BackArrow() {
     return (<svg width="13" height="13" viewBox="0 0 12 12" aria-hidden style={{ flexShrink: 0 }}>
       <path d="M10 6H3M5.8 3.2 3 6l2.8 2.8" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>);
 }
-function StepArrow() {
-    return (<svg className="step__arrow" width="18" height="18" viewBox="0 0 12 12" aria-hidden>
-      <path d="M2 6h7M6.2 3.2 9 6l-2.8 2.8" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+function StepArrow(props) {
+    return (<svg className="step__arrow" data-done={props.done ? "1" : "0"} width="36" height="12" viewBox="0 0 36 12" aria-hidden>
+      <path d="M1 6h26" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+      <path d="M23.5 2.2 33 6l-9.5 3.8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>);
 }
 function Check(props) {
@@ -1341,6 +1556,8 @@ function cellClass(st, base) {
         c.push(base + "--mine");
     else
         c.push(base + "--" + st.band);
+    if (!st.leaving && !st.joining && !st.mine && st.needs)
+        c.push(base + "--heat");
     if (st.selectable)
         c.push(base + "--click");
     return c.join(" ");
@@ -1354,7 +1571,16 @@ function CountLine(props) {
         {st.count}
         <span className="cell__of"> / {st.max}</span>
       </span>
+      <span className="cell__campus">{CAMPUS[st.slot.campus].short}</span>
+      {props.badge || null}
     </span>);
+}
+function needsBadgeFor(st, compact) {
+    if (st.needs)
+        return (<NeedsBadge compact={compact}/>);
+    if (!hasDiscipline(st.slot) && st.joining)
+        return (<NeedsBadge muted compact />);
+    return null;
 }
 function SlotCell(props) {
     const st = props.st;
@@ -1402,7 +1628,7 @@ function SlotCell(props) {
             <CountLine st={st} showExact={props.showExact}/>
             <Pips count={st.count} max={st.max}/>
             <span className="cell__foot">
-              {st.needs ? (<NeedsBadge />) : !hasDiscipline(st.slot) && st.joining ? (<NeedsBadge muted short />) : (<span className="cell__state">{CAMPUS[st.slot.campus].short}</span>)}
+              {needsBadgeFor(st, true)}
             </span>
           </>)}
       </div>
@@ -1440,17 +1666,13 @@ function SlotRow(props) {
                 {st.count}
                 <span className="cell__of"> / {st.max}</span>
               </span>
+              <span className="cell__campus">{CAMPUS[st.slot.campus].short}</span>
               <Pips count={st.count} max={st.max}/>
             </span>
-            <span className="cell__state">{CAMPUS[st.slot.campus].name}</span>
+            {needsBadgeFor(st, true)}
           </>)}
       </span>
       <span className="lrow__end">
-        {!own && !bland ? (
-          st.needs || (!hasDiscipline(st.slot) && st.joining) ? (
-            <NeedsBadge muted={st.joining && !st.needs} short={st.joining && !st.needs} />
-          ) : null
-        ) : null}
         {st.joining ? <span className="tag tag--join">Join {st.joinIndex}</span> : null}
       </span>
     </div>);
@@ -1463,7 +1685,7 @@ function Steps(props) {
       {items.map((label, i) => {
             const n = i + 1;
             return (<div key={label} className="stepwrap">
-            {i > 0 ? <StepArrow /> : null}
+            {i > 0 ? <StepArrow done={n <= at} /> : null}
             <div className="step" data-on={n === at ? "1" : "0"} data-done={n < at ? "1" : "0"}>
               <b>{n < at ? <Check big/> : n}</b>
               <span className="step__t">{label}</span>
@@ -1473,7 +1695,8 @@ function Steps(props) {
     </div>);
 }
 function Filters(props) {
-    const active = (props.openOnly ? 1 : 0) + (props.needsOnly ? 1 : 0) + (props.day !== "All" ? 1 : 0) + (props.query ? 1 : 0);
+    const campusOffDefault = props.campus !== props.primaryCampus;
+    const active = (props.openOnly ? 1 : 0) + (props.needsOnly ? 1 : 0) + (props.day !== "All" ? 1 : 0) + (campusOffDefault ? 1 : 0) + (props.query ? 1 : 0);
     return (<div className="filters">
       <span className="filters__label">
         Filters
@@ -1485,6 +1708,10 @@ function Filters(props) {
       <button type="button" className="chip chip--rose" data-on={props.needsOnly ? "1" : "0"} onClick={props.onNeeds}>
         No {DISCIPLINE.short}
       </button>
+      <span className="filters__rule"/>
+      {CAMPUS_KEYS.map((key) => (<button key={key} type="button" className="chip" data-on={props.campus === key ? "1" : "0"} onClick={() => props.onCampus(key)} title={CAMPUS[key].name}>
+          {CAMPUS[key].short}
+        </button>))}
       <span className="filters__rule"/>
       {["All"].concat(DAYS).map((d) => (<button key={d} type="button" className="chip" data-on={props.day === d ? "1" : "0"} onClick={() => props.onDay(d)}>
           {d}
@@ -1548,7 +1775,9 @@ function ConfirmSide(props) {
         <div className="side__title">{props.self ? "Your move" : "Move for " + props.who}</div>
         <div className="side__match">
           Leaving <b>{props.leave.length}</b>, joining <b>{props.join.length}</b>
-          {matched ? ", ready to confirm" : remaining > 0 ? ", pick " + remaining + " more" : ", remove " + -remaining}
+          {matched ? (
+            <span className="side__ready"><Check /> ready to confirm</span>
+          ) : remaining > 0 ? ", pick " + remaining + " more" : ", remove " + -remaining}
         </div>
       </div>
       <div className="side__body">
@@ -1610,13 +1839,14 @@ function ConfirmSide(props) {
       </div>
       <div className="side__foot">
         <button type="button" className="btn btn--primary btn--block" disabled={!matched || props.stale.length > 0} onClick={props.onApply}>
+          {matched && props.stale.length === 0 ? <Check /> : null}
           {props.self ? "Confirm move" : "Apply move"}
         </button>
         <button type="button" className="btn btn--link" onClick={props.onBack}>
           Back to step 1
         </button>
         <div className="pick__meta">
-          This applies straight away. No approval needed.
+          Applies straight away. To change a joined hour, move it again while it is still open.
         </div>
       </div>
     </div>);
@@ -1650,8 +1880,8 @@ function PlfSearch(props) {
               </div>) : null}
           </div>
         </div>
-        <Tip text="Phase 1 moves stay on the PLF's own discipline roster.">
-          <span className="pill pill--active plfpick__disc">{DISCIPLINE.full}</span>
+        <Tip text={DISCIPLINE.full}>
+          <span className="pill pill--active plfpick__disc">{DISCIPLINE.short}</span>
         </Tip>
       </div>
     </div>);
@@ -1666,6 +1896,7 @@ function MoveFlow(props) {
     const [openOnly, setOpenOnly] = useCanvasState(keyp + "fopen", false);
     const [needsOnly, setNeedsOnly] = useCanvasState(keyp + "fneeds", false);
     const [day, setDay] = useCanvasState(keyp + "fday", "All");
+    const [campus, setCampus] = useCanvasState(keyp + "fcampus", PRIMARY_CAMPUS);
     const [query, setQuery] = useCanvasState(keyp + "fq", "");
     const canExceed = props.role !== "plf";
     function st(s) {
@@ -1691,7 +1922,9 @@ function MoveFlow(props) {
      * added without going back a step); everything else toggles as a join target.
      */
     function pick(id) {
-        if (MY_SHIFTS.indexOf(id) >= 0) {
+        const s = byId(id);
+        const isMine = MY_SHIFTS.indexOf(id) >= 0 || (s && peopleOf(s, applied).some((p) => p.name === "You"));
+        if (isMine) {
             if (leave.indexOf(id) >= 0) {
                 dropLeave(id);
             }
@@ -1714,6 +1947,7 @@ function MoveFlow(props) {
         setStage("choose");
         setLeave([]);
         setJoin([]);
+        setApplied(null);
     }
     const mine = SLOTS.filter((s) => MY_SHIFTS.indexOf(s.id) >= 0 && (!applied || applied.leave.indexOf(s.id) < 0));
     /* ---- step 1 ---- */
@@ -1727,11 +1961,10 @@ function MoveFlow(props) {
           <h1 className="pg__title">{props.self ? "Move a Shift" : "Move a Shift for a PLF"}</h1>
           <p className="pg__sub">
             {props.self
-                ? "Move hours you cannot make to other hours in the same week. Your total hours stay the same."
+                ? "Move hours you cannot make to other hours this week. Your total hours stay the same."
                 : "Move hours for a PLF on their discipline roster. Their total hours stay the same."}
           </p>
         </div>
-        <Steps stage="choose"/>
         </div>
 
         <div className="step1panel">
@@ -1747,7 +1980,7 @@ function MoveFlow(props) {
               <div className="empty__s">
                 {noRoster
                     ? "Add your availabilities so the team can roster you. Once hours are assigned, you can move them here."
-                    : "Every rostered hour is already moved or marked absent this week."}
+                    : "Marked absent hours cannot be moved."}
               </div>
               {noRoster && props.self ? (<button type="button" className="btn btn--primary" style={{ marginTop: 4 }}>
                   Add availabilities
@@ -1768,6 +2001,7 @@ function MoveFlow(props) {
                       <span className="pickrow__when">
                         {s.day} {s.start}
                       </span>
+                      <span className="pickrow__dot" aria-hidden>·</span>
                       <span className="pickrow__where">{CAMPUS[s.campus].name}</span>
                     </span>
                   </button>);
@@ -1805,6 +2039,8 @@ function MoveFlow(props) {
             return false;
         if (day !== "All" && s.day !== day && !pinned)
             return false;
+        if (s.campus !== campus)
+            return false;
         if (query) {
             const hay = (s.day + " " + s.start + " " + CAMPUS[s.campus].name + " " + s.people.map((p) => p.name).join(" ")).toLowerCase();
             if (hay.indexOf(query.toLowerCase()) < 0)
@@ -1822,28 +2058,27 @@ function MoveFlow(props) {
         <button type="button" className="btn btn--back" onClick={() => setStage("choose")}>
           <BackArrow /> Back
         </button>
-        <div>
-          <h1 className="pg__title">{props.self ? "Move a Shift" : "Move a Shift for " + props.who}</h1>
-        </div>
+        <h1 className="pg__title">{props.self ? "Move a Shift" : "Move a Shift for " + props.who}</h1>
       </div>
-      <Steps stage="join"/>
       </div>
-
-      <Filters view={view} onView={setView} openOnly={openOnly} needsOnly={needsOnly} day={day} query={query} onOpen={() => setOpenOnly(!openOnly)} onNeeds={() => setNeedsOnly(!needsOnly)} onDay={setDay} onQuery={setQuery} onClear={() => {
-            setOpenOnly(false);
-            setNeedsOnly(false);
-            setDay("All");
-            setQuery("");
-        }}/>
 
       <div className="work">
         <div className="work__main">
-          {visible.length === 0 ? (<div className="card">
+          <div className="board">
+          <Filters view={view} onView={setView} openOnly={openOnly} needsOnly={needsOnly} day={day} campus={campus} primaryCampus={PRIMARY_CAMPUS} query={query} onOpen={() => setOpenOnly(!openOnly)} onNeeds={() => setNeedsOnly(!needsOnly)} onDay={setDay} onCampus={setCampus} onQuery={setQuery} onClear={() => {
+            setOpenOnly(false);
+            setNeedsOnly(false);
+            setDay("All");
+            setCampus(PRIMARY_CAMPUS);
+            setQuery("");
+        }}/>
+
+          {visible.length === 0 ? (
               <div className="empty">
                 <div className="empty__t">No hours match these filters</div>
                 <div className="empty__s">Clear a filter to see more of the week.</div>
               </div>
-            </div>) : null}
+            ) : null}
 
           {view === "week" ? (<div className="gridwrap">
               <table className="grid">
@@ -1870,15 +2105,15 @@ function MoveFlow(props) {
             </div>) : null}
 
           <div className={view === "week" ? "only-narrow" : ""}>
-            <div className="list" style={{ marginTop: view === "week" ? 0 : 0 }}>
+            <div className="list">
               {visible.map((s) => (<SlotRow key={s.id} st={st(s)} showExact={props.showExact} onPick={pick} onDrop={dropLeave}/>))}
             </div>
+          </div>
           </div>
         </div>
 
         <div className="work__side">
           <ConfirmSide who={props.who} self={props.self} leave={leave} join={join} caps={props.caps} canExceed={canExceed} stale={stale} onDropLeave={dropLeave} onDropJoin={(id) => setJoin(join.filter((x) => x !== id))} onApply={() => {
-            setApplied({ leave: leave, join: join });
             props.onApplied(leave, join);
             reset();
         }} onBack={() => setStage("choose")}/>
@@ -1887,8 +2122,22 @@ function MoveFlow(props) {
     </div>);
 }
 /* ---------------------------------------------------------------- SSP screens */
+function MoveStatusBadges(props) {
+    const badges = [];
+    badges.push(<span key="active" className="pill pill--active">
+        Active
+      </span>);
+    if (props.overflowReason) {
+        badges.push(<span key="over" className="pill pill--over" title={props.overflowReason}>
+          Over capacity
+        </span>);
+    }
+    return (<div className={"tbl__badges" + (badges.length > 2 ? " tbl__badges--stack" : "")}>
+      {badges}
+    </div>);
+}
 function ActiveMoves(props) {
-    return (<div className="page page--narrow">
+    return (<div className="page page--moves">
       <div className="pg__head">
         <h1 className="pg__title">Active Shift Moves</h1>
         <p className="pg__sub">
@@ -1957,23 +2206,18 @@ function ActiveMoves(props) {
                     <td>{m.by}</td>
                     <td className="tbl__act">
                       <div className="tbl__act-inner">
-                      {m.overflowReason ? (<span className="pill pill--over" title={m.overflowReason}>
-                          Over capacity
-                        </span>) : null}
-                      <span className="pill pill--active">
-                        Active
-                      </span>
-                      <Tip text={"Cancels all " +
+                        <MoveStatusBadges overflowReason={m.overflowReason}/>
+                        <Tip text={"Cancels all " +
                     m.leave.length +
                     " leaving and " +
                     m.join.length +
                     " joining " +
                     plural(m.join.length, "hour", "hours") +
                     ". Moves cannot be cancelled in part."}>
-                        <button type="button" className="btn btn--danger btn--compact" onClick={() => props.onCancel(m.id)}>
-                          Cancel move
-                        </button>
-                      </Tip>
+                          <button type="button" className="btn btn--danger btn--compact" onClick={() => props.onCancel(m.id)}>
+                            Cancel move
+                          </button>
+                        </Tip>
                       </div>
                     </td>
                   </tr>))}
@@ -2079,6 +2323,14 @@ function AbsenceReallocationPhase1Prototype() {
     const [moves, setMoves] = useCanvasState("mvs_moves", SEED_MOVES);
     const [who, setWho] = useCanvasState("mvs_who", PLF_OPTIONS[0]);
     const [toast, setToast] = useCanvasState("mvs_toast", null);
+    const [plfStage] = useCanvasState("mvs_p_stage", "choose");
+    const [sspStage] = useCanvasState("mvs_a_stage", "choose");
+    useEffect(() => {
+        if (!toast)
+            return;
+        const t = setTimeout(() => setToast(null), 3600);
+        return () => clearTimeout(t);
+    }, [toast]);
     const isPlf = role === "plf";
     const exactFor = isPlf ? showExact : true;
     const nav = isPlf
@@ -2120,11 +2372,16 @@ function AbsenceReallocationPhase1Prototype() {
             plural(leave.length, "hour", "hours") +
             " moved.");
     }
-    return (<div className="mvs">
+    const roleTitle = role === "admin" ? "Administrator" : role === "ssp" ? "Duty Host" : "PLF";
+    const onMoveFlow = current === "move" || current === "assign";
+    const moveStage = current === "assign" ? sspStage : plfStage;
+    return (<div className={"mvs" + (onMoveFlow ? " has-notch" : "")}>
       <style>{CSS}</style>
 
       <div className="mvs__bar">
-        <span className="mvs__brand">Student Success, STEM Support</span>
+        <div className="mvs__branding">
+          <span className="mvs__brand">Student Success – STEM Support</span>
+        </div>
         <span className="mvs__spacer"/>
         <span className="mvs__demo">
           <span>Preview as</span>
@@ -2147,8 +2404,13 @@ function AbsenceReallocationPhase1Prototype() {
             Admin
           </button>
         </span>
-        <span className="mvs__who">Jack A</span>
+        <div className="mvs__who-block">
+          <div className="mvs__who-name">Jack A</div>
+          <div className="mvs__who-role">{roleTitle}</div>
+        </div>
       </div>
+
+      {onMoveFlow ? (<div className="mvs__notch"><Steps stage={moveStage}/></div>) : null}
 
       <div className="mvs__tabs">
         {nav.map((n) => (<button key={n.id} type="button" className="chip" data-on={current === n.id ? "1" : "0"} onClick={() => setScreen(n.id)}>
@@ -2158,7 +2420,7 @@ function AbsenceReallocationPhase1Prototype() {
 
       <div className="mvs__body">
         <nav className="mvs__nav">
-          <div className="mvs__navhead">{isPlf ? "MY ROSTER" : "ROSTER"}</div>
+          <div className="mvs__navhead">{isPlf ? "My roster" : "Administration"}</div>
           {nav.map((n) => (<button key={n.id} type="button" className="mvs__navitem" data-on={current === n.id ? "1" : "0"} onClick={() => setScreen(n.id)}>
               {n.label}
             </button>))}
@@ -2175,9 +2437,10 @@ function AbsenceReallocationPhase1Prototype() {
         </main>
       </div>
 
-      {toast ? (<div className="toast">
+      {toast ? (<div className="toast" key={toast} role="status">
+          <span className="toast__ok"><Check /></span>
           <span>{toast}</span>
-          <button type="button" onClick={() => setToast(null)}>
+          <button type="button" onClick={() => setToast(null)} aria-label="Dismiss">
             ×
           </button>
         </div>) : null}
